@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 python -u run.py \
     --task_name pretrain \
-    --root_path /media/HDD2/Data/EEG_benchmark/classification/dataset/weather/ \
+    --root_path ./dataset/weather/ \
     --data_path weather.csv \
     --model_id Weather \
     --model SimMTM \

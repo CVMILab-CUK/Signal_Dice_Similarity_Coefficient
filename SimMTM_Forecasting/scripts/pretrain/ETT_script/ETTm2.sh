@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=0,1
 
 python -u run.py \
     --task_name pretrain \
-    --root_path /media/HDD2/Data/EEG_benchmark/classification/dataset/ETT-small/ \
+    --root_path ./dataset/ETT-small/ \
     --data_path ETTm2.csv \
     --model_id ETTm2 \
     --model SimMTM \

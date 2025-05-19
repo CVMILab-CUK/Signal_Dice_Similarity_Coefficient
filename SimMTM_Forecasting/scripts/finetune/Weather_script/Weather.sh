@@ -4,7 +4,7 @@ for pred_len in 96 192 336 720; do
     python -u run.py \
         --task_name finetune \
         --is_training 1 \
-        --root_path /media/HDD2/Data/EEG_benchmark/classification/dataset/weather/ \
+        --root_path ./dataset/weather/ \
         --data_path weather.csv \
         --model_id Weather \
         --model SimMTM \

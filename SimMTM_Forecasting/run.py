@@ -100,17 +100,17 @@ if args.use_gpu and args.use_multi_gpu:
     device_ids = args.devices.split(',')
     args.device_ids = [int(id_) for id_ in device_ids]
 
-# Check Loss mode
-assert args.loss_mode in ['mse', 'sdsc', 'hybrid'], f"Check your Loss mode we only support 'mse','sdsc','hybird', now : {args.loss_mode}"
-
 print('Args in experiment:')
 print(args)
+
+# Check Loss mode
+assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw'], f"Check your Loss mode we only support 'mse','sdsc','hybird' 'mae' and 'dtw', now : {args.loss_mode}"
 
 Exp = Exp_SimMTM
 if args.task_name == 'pretrain':
     for ii in range(args.itr):
         # setting record of experiments
-        setting = '{}_{}_{}_{}_sl{}_ll{}_pl{}_dm{}_df{}_nh{}_el{}_dl{}_fc{}_dp{}_hdp{}_ep{}_bs{}_lr{}_lm{}_pn{}_mr{}_tp{}_loss_mode{}'.format(
+        setting = '{}_{}_{}_{}_sl{}_ll{}_pl{}_dm{}_df{}_nh{}_el{}_dl{}_fc{}_dp{}_hdp{}_ep{}_bs{}_lr{}_lm{}_pn{}_mr{}_tp{}'.format(
             args.task_name,
             args.model,
             args.data,

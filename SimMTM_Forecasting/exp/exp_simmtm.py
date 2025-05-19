@@ -77,38 +77,46 @@ class Exp_SimMTM(Exp_Basic):
         for epoch in range(self.args.train_epochs):
             start_time = time.time()
 
-            train_loss, train_cl_loss, train_rb_loss, train_sd_loss = self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
-            vali_loss, valid_cl_loss, valid_rb_loss, valid_sd_loss = self.valid_one_epoch(vali_loader)
+            train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric= self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
+            valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric = self.valid_one_epoch(vali_loader)
 
             # log and Loss
             end_time = time.time()
             print(
-                "Epoch: {0}, Lr: {1:.7f}, Time: {2:.2f}s | Train Loss: {3:.4f}/{4:.4f}/{5:.4f} Val Loss: {6:.4f}/{7:.4f}/{8:.4f}"
+                "Epoch: {0}, Lr: {1:.7f}, Time: {2:.2f}s | Train Loss: {3:.4f}/{4:.4f}/{5:.4f}/{6:.4f}/{7:.4f}/{8:.4f} Val Loss: {9:.4f}/{10:.4f}/{11:.4f}/{12:.4f}/{13:.4f}/{14:.4f} | Metric: {15:.4f}/{16:.4f}"
                 .format(epoch, model_scheduler.get_lr()[0], end_time - start_time, train_loss, train_cl_loss,
-                        train_rb_loss, vali_loss, valid_cl_loss, valid_rb_loss))
+                        train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss,
+                        valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss,
+                        train_sdsc_metric, valid_sdsc_metric))
 
             loss_scalar_dict = {
                 'train_loss': train_loss,
                 'train_cl_loss': train_cl_loss,
                 'train_rb_loss': train_rb_loss,
-                'train_sd_loss': train_sd_loss,
-                'vali_loss': vali_loss,
+                'train_sdsc_loss':train_sdsc_loss,
+                'train_mae_loss': train_mae_loss,
+                'train_dtw_loss': train_dtw_loss,
+                'train_sdsc':train_sdsc_metric,
+                'vali_loss': valid_loss,
                 'valid_cl_loss': valid_cl_loss,
                 'valid_rb_loss': valid_rb_loss,
-                'valid_sd_loss': valid_sd_loss,
+                'valid_sdsc_loss': valid_sdsc_loss,
+                'valid_mae_loss': valid_mae_loss,
+                'valid_dtw_loss':valid_dtw_loss,
+                'valid_sdsc': valid_sdsc_metric,
             }
 
             self.writer.add_scalars(f"/pretrain_loss", loss_scalar_dict, epoch)
 
             # checkpoint saving
-            if not min_vali_loss or vali_loss <= min_vali_loss:
+            if not min_vali_loss or valid_loss <= min_vali_loss:
                 if epoch == 0:
-                    min_vali_loss = vali_loss
+                    min_vali_loss = valid_loss
 
                 print(
-                    "Validation loss decreased ({0:.4f} --> {1:.4f}).  Saving model epoch{2} ...".format(min_vali_loss, vali_loss, epoch))
+                    "Validation loss decreased ({0:.4f} --> {1:.4f}).  Saving model epoch{2} ...".format(min_vali_loss, valid_loss, epoch))
 
-                min_vali_loss = vali_loss
+                min_vali_loss = valid_loss
                 self.encoder_state_dict = OrderedDict()
                 for k, v in self.model.state_dict().items():
                     if 'encoder' in k or 'enc_embedding' in k:
@@ -138,7 +146,10 @@ class Exp_SimMTM(Exp_Basic):
         train_loss = []
         train_cl_loss = []
         train_rb_loss = []
-        train_sd_loss = []
+        train_sdsc_loss = []
+        train_mae_loss  = []
+        train_dtw_loss  = []
+        train_sdsc_metric =[]
 
         self.model.train()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
@@ -173,7 +184,7 @@ class Exp_SimMTM(Exp_Basic):
             batch_x_mark = batch_x_mark.float().to(self.device)
 
             # encoder
-            loss, loss_cl, loss_rb, loss_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
             # backward
             loss.backward()
@@ -183,23 +194,31 @@ class Exp_SimMTM(Exp_Basic):
             train_loss.append(loss.item())
             train_cl_loss.append(loss_cl.item())
             train_rb_loss.append(loss_rb.item())
-            train_sd_loss.append(loss_sd.item())
-    
+            train_sdsc_loss.append(loss_sd.item())
+            train_mae_loss.append(loss_mae.item())
+            train_dtw_loss.append(loss_dtw.item())
+            train_sdsc_metric.append(metric_sd.item())
 
         model_scheduler.step()
 
-        train_loss = np.average(train_loss)
-        train_cl_loss = np.average(train_cl_loss)
-        train_rb_loss = np.average(train_rb_loss)
-        train_sd_loss = np.average(train_sd_loss)
+        train_loss        = np.average(train_loss)
+        train_cl_loss     = np.average(train_cl_loss)
+        train_rb_loss     = np.average(train_rb_loss)
+        train_sdsc_loss   = np.average(train_sdsc_loss)
+        train_mae_loss    = np.average(train_mae_loss)
+        train_dtw_loss    = np.average(train_dtw_loss)
+        train_sdsc_metric = np.average(train_sdsc_metric)
 
-        return train_loss, train_cl_loss, train_rb_loss, train_sd_loss
+        return train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric
 
     def valid_one_epoch(self, vali_loader):
         valid_loss = []
         valid_cl_loss = []
         valid_rb_loss = []
-        valid_sd_loss = []
+        valid_sdsc_loss = []
+        valid_mae_loss  = []
+        valid_dtw_loss  = []
+        valid_sdsc_metric = []
 
         self.model.eval()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
@@ -219,21 +238,26 @@ class Exp_SimMTM(Exp_Basic):
             batch_x_mark = batch_x_mark.float().to(self.device)
 
             # encoder
-            loss, loss_cl, loss_rb, loss_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
             # Record
             valid_loss.append(loss.item())
             valid_cl_loss.append(loss_cl.item())
             valid_rb_loss.append(loss_rb.item())
-            valid_sd_loss.append(loss_sd.item())
+            valid_sdsc_loss.append(loss_sd.item())
+            valid_mae_loss.append(loss_mae.item())
+            valid_dtw_loss.append(loss_dtw.item())
+            valid_sdsc_metric.append(metric_sd.item())
 
-        vali_loss = np.average(valid_loss)
-        valid_cl_loss = np.average(valid_cl_loss)
-        valid_rb_loss = np.average(valid_rb_loss)
-        valid_sd_loss = np.average(valid_sd_loss)
-
+        vali_loss         = np.average(valid_loss)
+        valid_cl_loss     = np.average(valid_cl_loss)
+        valid_rb_loss     = np.average(valid_rb_loss)
+        valid_sdsc_loss   = np.average(valid_sdsc_loss)
+        valid_mae_loss    = np.average(valid_mae_loss)
+        valid_dtw_loss    = np.average(valid_dtw_loss)
+        valid_sdsc_metric = np.average(valid_sdsc_metric)
         self.model.train()
-        return vali_loss, valid_cl_loss, valid_rb_loss, valid_sd_loss
+        return vali_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric
 
     def train(self, setting):
 

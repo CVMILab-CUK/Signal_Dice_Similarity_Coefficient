@@ -3,8 +3,10 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from .metrics import SignalDice
+import pysdtw
+from pysdtw import SoftDTW
 
+from .metrics import SignalDice
 
 
 class SignalDiceLoss(nn.Module):
@@ -17,6 +19,63 @@ class SignalDiceLoss(nn.Module):
     def forward(self, inputs, targets):
         sdsc_value = self.sdsc(inputs, targets)
         return 1 - sdsc_value
+
+class mae_loss(nn.Module):
+    def __init__(self):
+        super(mae_loss, self).__init__()
+
+    def forward(self, inputs, targets):
+        return torch.mean(torch.abs(inputs, targets))
+
+class dtw_loss(nn.Module):
+    def __init__(self, approx=True, gamma=1.0):
+        super(dtw_loss, self).__init__()
+
+        if approx:
+            fun = pysdtw.distance.pairwise_l2_squared
+            self.dtw = SoftDTW(gamma = gamma, dist_func=fun, use_cuda=False)
+        else:
+            self.dtw = self.dtw_distance_torch
+
+    def dtw_distance_torch(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Compute DTW distance for a batch of 1D signal pairs.
+        
+        Args:
+            x: tensor of shape (B, T)
+            y: tensor of shape (B, T)
+            
+        Returns:
+            dtw_distances: tensor of shape (B,)
+        """
+        B, T = inputs.shape
+        dtw_distances = []
+
+        for b in range(B):
+            x_b = inputs[b]
+            y_b = targets[b]
+            T1, T2 = len(x_b), len(y_b)
+
+            dtw = torch.full((T1 + 1, T2 + 1), float('inf'), device=inputs.device)
+            dtw[0, 0] = 0.0
+
+            for i in range(1, T1 + 1):
+                for j in range(1, T2 + 1):
+                    cost = torch.abs(x_b[i - 1] - y_b[j - 1])
+                    dtw[i, j] = cost + torch.min(
+                        dtw[i - 1, j],
+                        dtw[i, j - 1],
+                        dtw[i - 1, j - 1]
+                    )
+
+            dtw_distances.append(dtw[T1, T2] / T1)  # normalize
+
+        return torch.stack(dtw_distances)  # (B,)
+
+    
+    def forward(self, inputs, targets):
+        return self.dtw(inputs, targets).mean()
+
 
 
 def divide_no_nan(a, b):

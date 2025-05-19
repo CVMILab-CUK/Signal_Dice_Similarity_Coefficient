@@ -2,7 +2,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 python -u run.py \
     --task_name pretrain \
-    --root_path /media/HDD2/Data/EEG_benchmark/classification/dataset/traffic/ \
+    --root_path ./dataset/traffic/ \
     --data_path traffic.csv \
     --model_id Traffic \
     --model SimMTM \

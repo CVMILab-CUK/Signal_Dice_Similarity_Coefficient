@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 
+
 class SignalDice(nn.Module):
     def __init__(self, eps=1e-6):
         super(SignalDice,self).__init__()
@@ -31,7 +32,6 @@ class SignalDice(nn.Module):
        
         return torch.mean((2 * torch.sum(self.intersection) + self.eps) / (torch.sum(self.union) + self.eps)) 
         
-
 
 def RSE(pred, true):
     return np.sqrt(np.sum((true - pred) ** 2)) / np.sqrt(np.sum((true - true.mean()) ** 2))
@@ -71,5 +71,3 @@ def metric(pred, true):
     mspe = MSPE(pred, true)
 
     return mae, mse, rmse, mape, mspe
-
-

@@ -3,9 +3,9 @@ import torch.nn as nn
 from layers.Transformer_EncDec import Decoder, DecoderLayer, Encoder, EncoderLayer
 from layers.SelfAttention_Family import DSAttention, AttentionLayer
 from layers.Embed import DataEmbedding
-from utils.losses import AutomaticWeightedLoss, SignalDiceLoss
+from utils.losses import AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss
 from utils.tools import ContrastiveWeight, AggregationRebuild
-
+from utils.metrics import SignalDice as SDSC
 
 class Flatten_Head(nn.Module):
     def __init__(self, seq_len, d_model, pred_len, head_dropout=0):
@@ -80,20 +80,24 @@ class Model(nn.Module):
             # for series-wise representation
             self.pooler = Pooler_Head(configs.seq_len, configs.d_model, head_dropout=configs.head_dropout)
 
-            self.awl = AutomaticWeightedLoss(2)
+
             self.contrastive = ContrastiveWeight(self.configs)
             self.aggregation = AggregationRebuild(self.configs)
+            self.mse  = torch.nn.MSELoss()
+            self.sdsc = SignalDiceLoss()
+            self.mae  = mae_loss()
             
-            if self.configs.loss_mode == "mse":
-                self.mse  = torch.nn.MSELoss()
-                self.sdsc = None
-            elif self.configs.loss_mode =="sdsc":
-                self.mse  = None
-                self.sdsc = SignalDiceLoss()
+            if self.configs.loss_mode == "dtw":
+                self.dtw = dtw_loss(approx=True)
             else:
-                self.mse = torch.nn.MSELoss()
-                self.sdsc = SignalDiceLoss()
+                self.dtw = dtw_loss(approx=False)
+            
+            if self.configs.loss_mode == "hybrid":
                 self.awl = AutomaticWeightedLoss(3)
+            else:
+                self.awl = AutomaticWeightedLoss(2)
+
+            self.sdsc_metric = SDSC()
 
         elif self.task_name == 'finetune':
             self.head = Flatten_Head(configs.seq_len, configs.d_model, configs.pred_len, head_dropout=configs.head_dropout)
@@ -178,8 +182,6 @@ class Model(nn.Module):
 
         # data shape
         bs, seq_len, n_vars = x_enc.shape
-        loss_rb = torch.tensor([0])
-        loss_sd = torch.tensor([0])
 
         # normalization
         means = torch.sum(x_enc, dim=1) / torch.sum(mask == 1, dim=1)
@@ -222,26 +224,28 @@ class Model(nn.Module):
         pred_batch_x = dec_out[:batch_x.shape[0]]
 
         # series reconstruction
+        loss_rb = self.mse(pred_batch_x, batch_x.detach())
+        loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
+        loss_mae = self.mae(pred_batch_x, batch_x.detach())
+        loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
+
+
         if self.configs.loss_mode == "mse":
-            loss_rb = self.mse(pred_batch_x, batch_x.detach())
-
-            # loss
             loss = self.awl(loss_cl, loss_rb)
-
         elif self.configs.loss_mode =="sdsc":
-            loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
-
-            # loss
             loss = self.awl(loss_cl, loss_sd)
-
+        elif self.configs.loss_mode =="mae":
+            loss = self.awl(loss_cl, loss_mae)
+        elif self.configs.loss_mode == "dtw":
+            loss = self.awl(loss_dtw)
         else:
-            loss_rb = self.mse(pred_batch_x, batch_x.detach())
-            loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
-            # loss
             loss = self.awl(loss_cl, loss_rb, loss_sd)
+        
+        # metrics 
+        metric_sd = self.sdsc_metric(pred_batch_x, batch_x.detach())
+        
 
-
-        return loss, loss_cl, loss_rb, loss_sd, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
+        return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
 
     def forward(self, x_enc, x_mark_enc, batch_x=None, mask=None):
 

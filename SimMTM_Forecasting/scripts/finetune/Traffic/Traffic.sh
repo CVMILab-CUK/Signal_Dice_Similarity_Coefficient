@@ -3,7 +3,7 @@ export CUDA_VISIBLE_DEVICES=0
 for pred_len in 96 192 336 720; do
     python -u run.py \
         --task_name finetune \
-        --root_path /media/HDD2/Data/EEG_benchmark/classification/dataset/traffic/ \
+        --root_path ./dataset/traffic/ \
         --data_path traffic.csv \
         --model_id Traffic \
         --model SimMTM \
