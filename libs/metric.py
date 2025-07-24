@@ -26,12 +26,6 @@ class SignalDice(nn.Module):
 
         self.intersection = self.calc_inter(in_abs, tar_abs, same_sign_mat) 
         self.union        = self.calc_union(in_abs, tar_abs)
-        print("same_sign_mat min:", same_sign_mat.min().item())
-        print("same_sign_mat max:", same_sign_mat.max().item())
-
-
-        print("inputs == targets:", torch.allclose(inputs, targets))
-        print("sigmoid(inputs * targets * alpha):", same_sign_mat)
 
         return torch.mean((2 * torch.sum(self.intersection,dim=-1) + self.eps) / (torch.sum(self.union,dim=-1) + self.eps)) 
         

@@ -25,10 +25,10 @@ class SignalDice(nn.Module):
 
         # Make Heaviside Matrix
         with torch.no_grad():
-            same_sign_mat = torch.heaviside(inputs * targets, torch.tensor([0.], device=device))
+            same_sign_mat = torch.heaviside(inputs * targets, torch.tensor([1.], device=device))
 
         self.intersection = self.calc_inter(in_abs, tar_abs, same_sign_mat) 
         self.union        = self.calc_union(in_abs, tar_abs)
        
-        return torch.mean((2 * torch.sum(self.intersection) + self.eps) / (torch.sum(self.union) + self.eps)) 
+        return torch.mean((2 * torch.sum(self.intersection, dim=-1) + self.eps) / (torch.sum(self.union, dim=-1) + self.eps)) 
         
