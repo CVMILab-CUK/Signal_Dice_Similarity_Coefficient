@@ -43,7 +43,8 @@ def Trainer(model,
             args,
             configs,
             experiment_log_dir,
-            seed):
+            seed,
+            loss_mode):
     logger.debug("Pre-training started ....")
     os.makedirs(os.path.join(experiment_log_dir, f"saved_models"), exist_ok=True)
 
@@ -51,11 +52,11 @@ def Trainer(model,
     best_performance = None
     for epoch in range(1, args.pretrain_epoch + 1):
 
-        total_loss, total_cl_loss, total_rb_loss = model_pretrain(model, model_optimizer, model_scheduler, train_dl,
-                                                                  configs, args, device)
+        total_loss, total_cl_loss, total_rb_loss, total_sd_loss, total_mae_loss, total_dtw_loss, total_sd_metric= model_pretrain(model, model_optimizer, model_scheduler, train_dl,
+                                                                  configs, args, device, loss_mode)
 
         logger.debug(
-            f'Pre-training Epoch: {epoch}\t Train Loss: {total_loss:.4f}\t CL Loss: {total_cl_loss:.4f}\t RB Loss: {total_rb_loss:.4f}\n')
+            f'Pre-training Epoch: {epoch}\t Train Loss: {total_loss:.4f}\t CL Loss: {total_cl_loss:.4f}\t RB Loss: {total_rb_loss:.4f}\t SD Loss: {total_sd_loss:.4f}\t MAE Loss : {total_mae_loss:.4f} \t DTW Loss: {total_dtw_loss:.4f}\t SD Metric: {total_sd_metric:.4f}\n')
 
         chkpoint = {'seed': seed, 'epoch': epoch, 'train_loss': total_loss, 'model_state_dict': model.state_dict()}
         torch.save(chkpoint, os.path.join(experiment_log_dir, f"saved_models/", f'ckp_ep{epoch}.pt'))
@@ -110,10 +111,14 @@ def Trainer(model,
     return best_performance
 
 
-def model_pretrain(model, model_optimizer, model_scheduler, train_loader, configs, args, device):
+def model_pretrain(model, model_optimizer, model_scheduler, train_loader, configs, args, device, loss_mode):
     total_loss = []
     total_cl_loss = []
     total_rb_loss = []
+    total_sd_loss = []
+    total_dtw_loss = []
+    total_mae_loss = []
+    total_sd_metric = []
 
     model.train()
     for batch_idx, (data, labels) in enumerate(train_loader):
@@ -126,7 +131,7 @@ def model_pretrain(model, model_optimizer, model_scheduler, train_loader, config
             device)
 
         # Produce embeddings of original and masked samples
-        loss, loss_cl, loss_rb = model(data_masked_om, pretrain=True)
+        loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd = model(data_masked_om, pretrain=True)
 
         loss.backward()
         model_optimizer.step()
@@ -134,18 +139,33 @@ def model_pretrain(model, model_optimizer, model_scheduler, train_loader, config
         total_loss.append(loss.item())
         total_cl_loss.append(loss_cl.item())
         total_rb_loss.append(loss_rb.item())
+        total_sd_loss.append(loss_sd.item())
+        total_mae_loss.append(loss_mae.item())
+        total_dtw_loss.append(loss_dtw.item())
+        total_sd_metric.append(metric_sd.item())
 
     total_loss = torch.tensor(total_loss).mean()
     total_cl_loss = torch.tensor(total_cl_loss).mean()
     total_rb_loss = torch.tensor(total_rb_loss).mean()
+    total_sd_loss = torch.tensor(total_sd_loss).mean()
+    total_mae_loss = torch.tensor(total_mae_loss).mean()
+    total_dtw_loss = torch.tensor(total_dtw_loss).mean()
+    total_sd_metric = torch.tensor(total_sd_metric).mean()
+
 
     model_scheduler.step()
 
-    return total_loss, total_cl_loss, total_rb_loss
+    return total_loss, total_cl_loss, total_rb_loss, total_sd_loss, total_mae_loss, total_dtw_loss, total_sd_metric
 
 
-def model_finetune(model, val_dl, device, model_optimizer, model_scheduler, classifier=None, classifier_optimizer=None):
-    model.train()
+def model_finetune(model, val_dl, device, model_optimizer, model_scheduler, classifier=None, classifier_optimizer=None, frozen=True):
+    # model.train()
+    if frozen:
+        model.eval()
+        for p in model.parameters():
+            p.requires_grad = False
+    else:
+        model.train()
     classifier.train()
 
     total_loss = []
@@ -156,9 +176,11 @@ def model_finetune(model, val_dl, device, model_optimizer, model_scheduler, clas
     criterion = nn.CrossEntropyLoss()
     outs = np.array([])
     trgs = np.array([])
-
+    # print(val_dl)
     for data, labels in val_dl:
-        model_optimizer.zero_grad()
+        # print(labels)
+        if not frozen:
+            model_optimizer.zero_grad()
         classifier_optimizer.zero_grad()
 
         data, labels = data.float().to(device), labels.long().to(device)
@@ -196,7 +218,8 @@ def model_finetune(model, val_dl, device, model_optimizer, model_scheduler, clas
         total_loss.append(loss.item())
 
         loss.backward()
-        model_optimizer.step()
+        if not frozen:
+            model_optimizer.step()
         classifier_optimizer.step()
 
         pred = predictions.max(1, keepdim=True)[1]

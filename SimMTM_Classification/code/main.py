@@ -7,6 +7,7 @@ from dataloader import data_generator
 from trainer import Trainer
 import os
 import torch
+import random
 
 # Args selections
 start_time = datetime.now()
@@ -32,7 +33,7 @@ parser.add_argument('--pretrain_lr', default=0.0001, type=float, help='pretrain 
 parser.add_argument('--lr', default=0.0001, type=float, help='learning rate')
 parser.add_argument('--use_pretrain_epoch_dir', default=None, type=str,
                     help='choose the pretrain checkpoint to finetune')
-parser.add_argument('--pretrain_epoch', default=10, type=int, help='pretrain epochs')
+parser.add_argument('--pretrain_epoch', default=20, type=int, help='pretrain epochs')
 parser.add_argument('--finetune_epoch', default=300, type=int, help='finetune epochs')
 
 parser.add_argument('--masking_ratio', default=0.5, type=float, help='masking ratio')
@@ -42,16 +43,20 @@ parser.add_argument('--lm', default=3, type=int, help='average masked lenght')
 parser.add_argument('--finetune_result_file_name', default="finetune_result.json", type=str,
                     help='finetune result json name')
 parser.add_argument('--temperature', type=float, default=0.2, help='temperature')
+parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw"]')
+
 
 
 def set_seed(seed):
-    SEED = seed
-    torch.manual_seed(SEED)
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = False
-    np.random.seed(SEED)
+    os.environ["PYTHONHASHSEED"] = str(seed)  
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)  
+    torch.cuda.manual_seed_all(seed)  
 
-    return seed
+    torch.backends.cudnn.deterministic = True 
+    torch.backends.cudnn.benchmark = False     
 
 
 def main(args, configs, seed=None):
@@ -69,6 +74,7 @@ def main(args, configs, seed=None):
     finetune_epoch = args.finetune_epoch
     temperature = args.temperature
     experiment_description = f"{sourcedata}_2_{targetdata}"
+    loss_mode = args.loss_mode
 
     os.makedirs(logs_save_dir, exist_ok=True)
 
@@ -97,6 +103,7 @@ def main(args, configs, seed=None):
     logger.debug("=" * 45)
     logger.debug(f'Pre-training Dataset: {sourcedata}')
     logger.debug(f'Target (fine-tuning) Dataset: {targetdata}')
+    logger.debug(f'Loss Mode : {loss_mode}')
     logger.debug(f'Seed: {seed}')
     logger.debug(f'Method:  {method}')
     logger.debug(f'Mode:    {training_mode}')
@@ -117,7 +124,7 @@ def main(args, configs, seed=None):
 
     # Trainer
     best_performance = Trainer(model, model_optimizer, model_scheduler, train_dl, valid_dl, test_dl, device, logger,
-                               args, configs, experiment_log_dir, seed)
+                               args, configs, experiment_log_dir, seed, loss_mode)
 
     return best_performance
 

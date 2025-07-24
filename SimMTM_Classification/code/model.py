@@ -1,6 +1,7 @@
 from torch import nn
 import torch
-from loss import ContrastiveWeight, AggregationRebuild, AutomaticWeightedLoss
+from loss import ContrastiveWeight, AggregationRebuild, AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss
+from metrics import SignalDice as SDSC
 
 
 class TFC(nn.Module):
@@ -39,14 +40,27 @@ class TFC(nn.Module):
         )
 
         if self.training_mode == 'pre_train':
-            self.awl = AutomaticWeightedLoss(2)
+            # self.awl = AutomaticWeightedLoss(2)
             self.contrastive = ContrastiveWeight(args)
             self.aggregation = AggregationRebuild(args)
             self.head = nn.Linear(1280, 178)
-            self.mse = torch.nn.MSELoss()
+            # self.mse = torch.nn.MSELoss()
+        
+            # SET LOSS MODE
+            self.loss_mode = args.loss_mode
+            self.mse  = torch.nn.MSELoss()
+            self.sdsc = SignalDiceLoss()
+            self.mae  = mae_loss()            
+            self.dtw = dtw_loss(approx=True)
+
+            if self.loss_mode == "hybrid":
+                self.awl = AutomaticWeightedLoss(3)
+            else:
+                self.awl = AutomaticWeightedLoss(2)
+
+            self.sdsc_metric = SDSC()
 
     def forward(self, x_in_t, pretrain=False):
-
         if pretrain:
             x = self.conv_block1(x_in_t)
             x = self.conv_block2(x)
@@ -59,10 +73,31 @@ class TFC(nn.Module):
             rebuild_weight_matrix, agg_x = self.aggregation(similarity_matrix, x)
             pred_x = self.head(agg_x.reshape(agg_x.size(0), -1))
 
+            # series reconstruction
             loss_rb = self.mse(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
-            loss = self.awl(loss_cl, loss_rb)
+            loss_sd = self.sdsc(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+            loss_mae = self.mae(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+            loss_dtw = self.dtw(pred_x.unsqueeze(1), x_in_t.reshape(x_in_t.size(0), 1, -1).detach())
 
-            return loss, loss_cl, loss_rb
+
+            if self.loss_mode == "mse":
+                loss = self.awl(loss_cl, loss_rb)
+            elif self.loss_mode =="sdsc":
+                loss = self.awl(loss_cl, loss_sd)
+            elif self.loss_mode =="mae":
+                loss = self.awl(loss_cl, loss_mae)
+            elif self.loss_mode == "dtw":
+                loss = self.awl(loss_dtw)
+            else:
+                loss = self.awl(loss_cl, loss_rb, loss_sd)
+
+            # metrics 
+            metric_sd = self.sdsc_metric(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+
+            # loss_rb = self.mse(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+            # loss = self.awl(loss_cl, loss_rb)
+
+            return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd
         else:
             x = self.conv_block1(x_in_t)
             x = self.conv_block2(x)
