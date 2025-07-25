@@ -61,9 +61,15 @@ $s \in S$ represents discrete sampling points in time, then set $S \subset T$. $
 
 ## Intallation
 ```
-pytorch > 2.1.0
-opencv-python == 4.9.0.80
-tensorboard==2.16.2
+Python == 3.10.16
+pytorch >= 2.6.0
+opencv-python == 4.11.0.86
+tensorboardX == 2.6.2.2
+matplotlib == 3.10.1
+seaborn    == 0.13.2
+numpy      == 1.26.4
+pysdtw     == 0.0.5
+pandas     == 2.2.3
 ```
 
 ## Get Started
