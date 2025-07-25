@@ -86,8 +86,8 @@ Signal Dice Similarity Loss Codes : [LINK](./libs/losses.py)
 
 ## Citation
 Not ready yet
-
+<!-- 
 ## Contact
-If you have any questions, please contact dlwpdud@catholic.ac.kr
+If you have any questions, please contact dlwpdud@catholic.ac.kr -->
 
 ## Acknowledgement
