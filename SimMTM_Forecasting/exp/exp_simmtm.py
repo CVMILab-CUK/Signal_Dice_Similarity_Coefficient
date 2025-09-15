@@ -78,7 +78,7 @@ class Exp_SimMTM(Exp_Basic):
             start_time = time.time()
 
             train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric= self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
-            valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric = self.valid_one_epoch(vali_loader)
+            valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric = self.valid_one_epoch(vali_loader, corr=True)
 
             # log and Loss
             end_time = time.time()
@@ -186,6 +186,15 @@ class Exp_SimMTM(Exp_Basic):
             # encoder
             loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
+            # Gathering
+            loss      = loss.mean()
+            loss_cl   = loss_cl.mean()
+            loss_rb   = loss_rb.mean()
+            loss_sd   = loss_sd.mean()
+            loss_mae  = loss_mae.mean()
+            loss_dtw  = loss_dtw.mean()
+            metric_sd = metric_sd.mean()
+
             # backward
             loss.backward()
             model_optim.step()
@@ -211,7 +220,7 @@ class Exp_SimMTM(Exp_Basic):
 
         return train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric
 
-    def valid_one_epoch(self, vali_loader):
+    def valid_one_epoch(self, vali_loader, corr=False):
         valid_loss = []
         valid_cl_loss = []
         valid_rb_loss = []
@@ -239,7 +248,17 @@ class Exp_SimMTM(Exp_Basic):
 
             # encoder
             loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            
+            # Gathering
+            loss      = loss.mean()
+            loss_cl   = loss_cl.mean()
+            loss_rb   = loss_rb.mean()
+            loss_sd   = loss_sd.mean()
+            loss_mae  = loss_mae.mean()
+            loss_dtw  = loss_dtw.mean()
+            metric_sd = metric_sd.mean()
 
+            
             # Record
             valid_loss.append(loss.item())
             valid_cl_loss.append(loss_cl.item())
@@ -248,7 +267,10 @@ class Exp_SimMTM(Exp_Basic):
             valid_mae_loss.append(loss_mae.item())
             valid_dtw_loss.append(loss_dtw.item())
             valid_sdsc_metric.append(metric_sd.item())
-
+        if corr is True:
+            with open("./outputs/sample_result.txt", "w") as f:
+                for mse, sdsc in zip(valid_rb_loss, valid_sdsc_metric):
+                    f.write(f"{mse} {sdsc}\n")
         vali_loss         = np.average(valid_loss)
         valid_cl_loss     = np.average(valid_cl_loss)
         valid_rb_loss     = np.average(valid_rb_loss)
@@ -374,7 +396,7 @@ class Exp_SimMTM(Exp_Basic):
         self.model.train()
         return total_loss
 
-    def test(self):
+    def test(self, loss_mode):
         test_data, test_loader = self._get_data(flag='test')
 
         preds = []
@@ -409,7 +431,7 @@ class Exp_SimMTM(Exp_Basic):
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('{0}->{1}, mse:{2:.3f}, mae:{3:.3f}'.format(self.args.seq_len, self.args.pred_len, mse, mae))
-        f = open("./outputs/score.txt", 'a')
+        f = open(f"./outputs/{loss_mode}_score.txt", 'a')
         f.write('{0}->{1}, {2:.3f}, {3:.3f} \n'.format(self.args.seq_len, self.args.pred_len, mse, mae))
         f.close()
 
@@ -438,7 +460,7 @@ class Exp_SimMTM(Exp_Basic):
 
         # Encoder
         with torch.no_grad():
-            loss, loss_cl, loss_rb, positives_mask, logits, rebuild_weight_matrix, pred_batch_x = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd,positives_mask, logits, rebuild_weight_matrix, pred_batch_x = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
         for i in range(num):
 

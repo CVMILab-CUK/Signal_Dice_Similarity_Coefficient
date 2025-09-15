@@ -25,15 +25,15 @@ class mae_loss(nn.Module):
         super(mae_loss, self).__init__()
 
     def forward(self, inputs, targets):
-        return torch.mean(torch.abs(inputs, targets))
+        return torch.mean(torch.abs(inputs - targets))
 
 class dtw_loss(nn.Module):
-    def __init__(self, approx=True, gamma=1.0):
+    def __init__(self, approx=True, gamma=1.0, use_cuda=True):
         super(dtw_loss, self).__init__()
 
         if approx:
             fun = pysdtw.distance.pairwise_l2_squared
-            self.dtw = SoftDTW(gamma = gamma, dist_func=fun, use_cuda=False)
+            self.dtw = SoftDTW(gamma = gamma, dist_func=fun, use_cuda=use_cuda)
         else:
             self.dtw = self.dtw_distance_torch
 
@@ -42,16 +42,19 @@ class dtw_loss(nn.Module):
         Compute DTW distance for a batch of 1D signal pairs.
         
         Args:
-            x: tensor of shape (B, T)
-            y: tensor of shape (B, T)
+            x: tensor of shape (B, C, T)
+            y: tensor of shape (B, C, T)
             
         Returns:
             dtw_distances: tensor of shape (B,)
         """
-        B, T = inputs.shape
-        dtw_distances = []
+        print(inputs.shape)
+        B, C, T = inputs.shape
+        inputs = inputs.reshape(B*C, T)
+        targets = targets.reshape(B*C, T)
 
-        for b in range(B):
+        dtw_distances = []
+        for b in range(B*C):
             x_b = inputs[b]
             y_b = targets[b]
             T1, T2 = len(x_b), len(y_b)
@@ -63,18 +66,18 @@ class dtw_loss(nn.Module):
                 for j in range(1, T2 + 1):
                     cost = torch.abs(x_b[i - 1] - y_b[j - 1])
                     dtw[i, j] = cost + torch.min(
-                        dtw[i - 1, j],
+                        torch.stack([dtw[i - 1, j],
                         dtw[i, j - 1],
-                        dtw[i - 1, j - 1]
+                        dtw[i - 1, j - 1]])
                     )
 
             dtw_distances.append(dtw[T1, T2] / T1)  # normalize
 
-        return torch.stack(dtw_distances)  # (B,)
+        return torch.stack(dtw_distances).contiguous().view(B, C).mean(dim=1)  # (B, C)
 
     
     def forward(self, inputs, targets):
-        return self.dtw(inputs, targets).mean()
+        return self.dtw(inputs, targets).sum()
 
 
 
