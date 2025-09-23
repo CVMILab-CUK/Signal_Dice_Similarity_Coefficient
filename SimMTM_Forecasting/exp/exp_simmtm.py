@@ -17,15 +17,15 @@ import random
 
 warnings.filterwarnings('ignore')
 
-
 class Exp_SimMTM(Exp_Basic):
     def __init__(self, args):
         super(Exp_SimMTM, self).__init__(args)
-        self.writer = SummaryWriter(f"./outputs/logs")
+        self.writer = SummaryWriter(f"./outputs/logs/{args.data}")
+        self.patience = 5
 
     def _build_model(self):
         model = self.model_dict[self.args.model].Model(self.args).float()
-
+        print(torch.cuda.device_count())
         if self.args.load_checkpoints:
             print("Loading ckpt: {}".format(self.args.load_checkpoints))
 
@@ -57,6 +57,7 @@ class Exp_SimMTM(Exp_Basic):
         # data preparation
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
+        earlystopping_counts = 0
 
         # show cases
         self.train_show = next(iter(train_loader))
@@ -77,17 +78,17 @@ class Exp_SimMTM(Exp_Basic):
         for epoch in range(self.args.train_epochs):
             start_time = time.time()
 
-            train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric= self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
-            valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric = self.valid_one_epoch(vali_loader, corr=True)
+            train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric, train_pcc_metric, train_si_snr_metric = self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
+            valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric, valid_pcc_metric, valid_si_snr_metric = self.valid_one_epoch(vali_loader, corr=True)
 
             # log and Loss
             end_time = time.time()
             print(
-                "Epoch: {0}, Lr: {1:.7f}, Time: {2:.2f}s | Train Loss: {3:.4f}/{4:.4f}/{5:.4f}/{6:.4f}/{7:.4f}/{8:.4f} Val Loss: {9:.4f}/{10:.4f}/{11:.4f}/{12:.4f}/{13:.4f}/{14:.4f} | Metric: {15:.4f}/{16:.4f}"
+                "Epoch: {0}, Lr: {1:.7f}, Time: {2:.2f}s | Train Loss: {3:.4f}/{4:.4f}/{5:.4f}/{6:.4f}/{7:.4f}/{8:.4f} Val Loss: {9:.4f}/{10:.4f}/{11:.4f}/{12:.4f}/{13:.4f}/{14:.4f} | Metric: {15:.4f}/{16:.4f}/{17:.4f} |{18:.4f}/{19:.4f}/{20:.4f}"
                 .format(epoch, model_scheduler.get_lr()[0], end_time - start_time, train_loss, train_cl_loss,
                         train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss,
                         valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss,
-                        train_sdsc_metric, valid_sdsc_metric))
+                        train_sdsc_metric, train_pcc_metric, train_si_snr_metric, valid_sdsc_metric,valid_pcc_metric,valid_si_snr_metric))
 
             loss_scalar_dict = {
                 'train_loss': train_loss,
@@ -97,6 +98,8 @@ class Exp_SimMTM(Exp_Basic):
                 'train_mae_loss': train_mae_loss,
                 'train_dtw_loss': train_dtw_loss,
                 'train_sdsc':train_sdsc_metric,
+                'train_pcc_metric':train_pcc_metric,
+                'train_si_snr_metric':train_si_snr_metric,
                 'vali_loss': valid_loss,
                 'valid_cl_loss': valid_cl_loss,
                 'valid_rb_loss': valid_rb_loss,
@@ -104,9 +107,11 @@ class Exp_SimMTM(Exp_Basic):
                 'valid_mae_loss': valid_mae_loss,
                 'valid_dtw_loss':valid_dtw_loss,
                 'valid_sdsc': valid_sdsc_metric,
+                'valid_pcc_metric':valid_pcc_metric,
+                'valid_si_snr_metric':valid_si_snr_metric
             }
 
-            self.writer.add_scalars(f"/pretrain_loss", loss_scalar_dict, epoch)
+            self.writer.add_scalars(f"pretrain_loss", loss_scalar_dict, epoch)
 
             # checkpoint saving
             if not min_vali_loss or valid_loss <= min_vali_loss:
@@ -125,6 +130,9 @@ class Exp_SimMTM(Exp_Basic):
                         self.encoder_state_dict[k] = v
                 encoder_ckpt = {'epoch': epoch, 'model_state_dict': self.encoder_state_dict}
                 torch.save(encoder_ckpt, os.path.join(path, f"ckpt_best.pth"))
+                earlystopping_counts = 0
+            else:
+                earlystopping_counts += 1
 
             if (epoch + 1) % 10 == 0:
                 print("Saving model at epoch {}...".format(epoch + 1))
@@ -141,6 +149,8 @@ class Exp_SimMTM(Exp_Basic):
                 self.show(5, epoch + 1, 'train')
                 self.show(5, epoch + 1, 'valid')
 
+            if earlystopping_counts == self.patience:
+                break
     def pretrain_one_epoch(self, train_loader, model_optim, model_scheduler):
 
         train_loss = []
@@ -150,6 +160,8 @@ class Exp_SimMTM(Exp_Basic):
         train_mae_loss  = []
         train_dtw_loss  = []
         train_sdsc_metric =[]
+        train_pcc_metric = []
+        train_si_snr_metric = []
 
         self.model.train()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
@@ -184,7 +196,7 @@ class Exp_SimMTM(Exp_Basic):
             batch_x_mark = batch_x_mark.float().to(self.device)
 
             # encoder
-            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr,_, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
             # Gathering
             loss      = loss.mean()
@@ -194,6 +206,8 @@ class Exp_SimMTM(Exp_Basic):
             loss_mae  = loss_mae.mean()
             loss_dtw  = loss_dtw.mean()
             metric_sd = metric_sd.mean()
+            metric_pcc = metric_pcc.mean()
+            metric_si_snr = metric_si_snr.mean()
 
             # backward
             loss.backward()
@@ -207,6 +221,8 @@ class Exp_SimMTM(Exp_Basic):
             train_mae_loss.append(loss_mae.item())
             train_dtw_loss.append(loss_dtw.item())
             train_sdsc_metric.append(metric_sd.item())
+            train_pcc_metric.append(metric_pcc.item())
+            train_si_snr_metric.append(metric_si_snr.item())
 
         model_scheduler.step()
 
@@ -217,8 +233,10 @@ class Exp_SimMTM(Exp_Basic):
         train_mae_loss    = np.average(train_mae_loss)
         train_dtw_loss    = np.average(train_dtw_loss)
         train_sdsc_metric = np.average(train_sdsc_metric)
+        train_pcc_metric  = np.average(train_pcc_metric)
+        train_si_snr_metric = np.average(train_si_snr_metric)
 
-        return train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric
+        return train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric, train_pcc_metric, train_si_snr_metric
 
     def valid_one_epoch(self, vali_loader, corr=False):
         valid_loss = []
@@ -228,6 +246,8 @@ class Exp_SimMTM(Exp_Basic):
         valid_mae_loss  = []
         valid_dtw_loss  = []
         valid_sdsc_metric = []
+        valid_pcc_metric = []
+        valid_si_snr_metric = []
 
         self.model.eval()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
@@ -247,7 +267,7 @@ class Exp_SimMTM(Exp_Basic):
             batch_x_mark = batch_x_mark.float().to(self.device)
 
             # encoder
-            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, _, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr,_, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
             
             # Gathering
             loss      = loss.mean()
@@ -257,6 +277,8 @@ class Exp_SimMTM(Exp_Basic):
             loss_mae  = loss_mae.mean()
             loss_dtw  = loss_dtw.mean()
             metric_sd = metric_sd.mean()
+            metric_pcc = metric_pcc.mean()
+            metric_si_snr = metric_si_snr.mean()
 
             
             # Record
@@ -267,10 +289,14 @@ class Exp_SimMTM(Exp_Basic):
             valid_mae_loss.append(loss_mae.item())
             valid_dtw_loss.append(loss_dtw.item())
             valid_sdsc_metric.append(metric_sd.item())
+            valid_pcc_metric.append(metric_pcc.item())
+            valid_si_snr_metric.append(metric_si_snr.item())
+
+
         if corr is True:
             with open("./outputs/sample_result.txt", "w") as f:
                 for mse, sdsc in zip(valid_rb_loss, valid_sdsc_metric):
-                    f.write(f"{mse} {sdsc}\n")
+                    f.write(f"{mse} {sdsc} {valid_pcc_metric} {valid_si_snr_metric} \n")
         vali_loss         = np.average(valid_loss)
         valid_cl_loss     = np.average(valid_cl_loss)
         valid_rb_loss     = np.average(valid_rb_loss)
@@ -278,8 +304,10 @@ class Exp_SimMTM(Exp_Basic):
         valid_mae_loss    = np.average(valid_mae_loss)
         valid_dtw_loss    = np.average(valid_dtw_loss)
         valid_sdsc_metric = np.average(valid_sdsc_metric)
+        valid_pcc_metric  = np.average(valid_pcc_metric)
+        valid_si_snr_metric = np.average(valid_si_snr_metric)
         self.model.train()
-        return vali_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric
+        return vali_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric, valid_pcc_metric, valid_si_snr_metric
 
     def train(self, setting):
 
@@ -460,7 +488,7 @@ class Exp_SimMTM(Exp_Basic):
 
         # Encoder
         with torch.no_grad():
-            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd,positives_mask, logits, rebuild_weight_matrix, pred_batch_x = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr,positives_mask, logits, rebuild_weight_matrix, pred_batch_x = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
         for i in range(num):
 

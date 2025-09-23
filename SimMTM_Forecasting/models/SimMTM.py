@@ -3,9 +3,9 @@ import torch.nn as nn
 from layers.Transformer_EncDec import Decoder, DecoderLayer, Encoder, EncoderLayer
 from layers.SelfAttention_Family import DSAttention, AttentionLayer
 from layers.Embed import DataEmbedding
-from utils.losses import AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss
+from utils.losses import AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss, DTWLoss
 from utils.tools import ContrastiveWeight, AggregationRebuild
-from utils.metrics import SignalDice as SDSC
+from utils.metrics import SignalDice as SDSC, pearson_correlation, si_snr
 
 class Flatten_Head(nn.Module):
     def __init__(self, seq_len, d_model, pred_len, head_dropout=0):
@@ -86,11 +86,10 @@ class Model(nn.Module):
             self.mse  = torch.nn.MSELoss()
             self.sdsc = SignalDiceLoss()
             self.mae  = mae_loss()
-            
-            if self.configs.loss_mode == "dtw":
-                self.dtw = dtw_loss(approx=True)
-            else:
-                self.dtw = dtw_loss(approx=False)
+            self.pcc = pearson_correlation
+            self.si_snr = si_snr
+            # self.dtw = dtw_loss(approx=True)
+            self.dtw = DTWLoss()
             
             if self.configs.loss_mode == "hybrid":
                 self.awl = AutomaticWeightedLoss(3)
@@ -210,7 +209,6 @@ class Model(nn.Module):
         # series weight learning
         loss_cl, similarity_matrix, logits, positives_mask = self.contrastive(s_enc_out) # similarity_matrix: [(bs * n_vars) x (bs * n_vars)]
         rebuild_weight_matrix, agg_enc_out = self.aggregation(similarity_matrix, p_enc_out) # agg_enc_out: [(bs * n_vars) x seq_len x d_model]
-
         agg_enc_out = agg_enc_out.reshape(bs, n_vars, seq_len, -1) # agg_enc_out: [bs x n_vars x seq_len x d_model]
 
         # decoder
@@ -227,7 +225,14 @@ class Model(nn.Module):
         loss_rb = self.mse(pred_batch_x, batch_x.detach())
         loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
         loss_mae = self.mae(pred_batch_x, batch_x.detach())
-        loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
+        # loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
+        loss_dtw = torch.tensor([0.]).to(0)
+
+
+        # metrics 
+        metric_sd = self.sdsc_metric(pred_batch_x, batch_x.detach())
+        metric_pcc = self.pcc(pred_batch_x, batch_x.detach())
+        metric_si_snr = self.si_snr(pred_batch_x, batch_x.detach())
 
 
         if self.configs.loss_mode == "mse":
@@ -238,14 +243,17 @@ class Model(nn.Module):
             loss = self.awl(loss_cl, loss_mae)
         elif self.configs.loss_mode == "dtw":
             loss = self.awl(loss_dtw)
+        elif self.configs.loss_mode == "con":
+            loss = loss_cl
+        elif self.configs.loss_mode == "pcc":
+            loss = self.awl(loss_cl, (1 - metric_pcc))
+        elif self.configs.loss_mode == "snr":
+            loss = self.awl(loss_cl, (-metric_si_snr))
         else:
             loss = self.awl(loss_cl, loss_rb, loss_sd)
         
-        # metrics 
-        metric_sd = self.sdsc_metric(pred_batch_x, batch_x.detach())
-        
 
-        return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
+        return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc,  metric_si_snr, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
 
     def forward(self, x_enc, x_mark_enc, batch_x=None, mask=None):
 

@@ -4,7 +4,7 @@ from exp.exp_simmtm import Exp_SimMTM
 import random
 import numpy as np
 import os
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 fix_seed = 2023
 random.seed(fix_seed)
@@ -79,7 +79,7 @@ parser.add_argument('--use_amp', action='store_true', help='use automatic mixed 
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
 parser.add_argument('--gpu', type=int, default=0, help='gpu')
 parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
-parser.add_argument('--devices', type=str, default='0', help='device ids of multile gpus')
+parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
 
 # Pre-train
 parser.add_argument('--lm', type=int, default=3, help='average masking length')
@@ -90,7 +90,7 @@ parser.add_argument('--masked_rule', type=str, default='geometric', help='geomet
 parser.add_argument('--mask_rate', type=float, default=0.5, help='mask ratio')
 
 # Pre-train loss mode
-parser.add_argument('--loss_mode', type=str, default='mse', help='pretrain loss mode. ["mse", "sdsc", "hybird"]')
+parser.add_argument('--loss_mode', type=str, default='snr', help='pretrain loss mode. ["mse", "sdsc", "hybird"]')
 
 args = parser.parse_args()
 args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
@@ -104,7 +104,7 @@ print('Args in experiment:')
 print(args)
 
 # Check Loss mode
-assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw'], f"Check your Loss mode we only support 'mse','sdsc','hybird' 'mae' and 'dtw', now : {args.loss_mode}"
+assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw', 'con', 'pcc', 'snr'], f"Check your Loss mode we only support 'mse','sdsc','hybird' 'mae' and 'dtw', now : {args.loss_mode}"
 
 Exp = Exp_SimMTM
 if args.task_name == 'pretrain':
