@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 import pysdtw
 from pysdtw import SoftDTW
+from utils.soft_dtw_cuda import SoftDTW
 
 from torch import nn
 from metrics import SignalDice
@@ -26,6 +27,23 @@ class mae_loss(nn.Module):
     def forward(self, inputs, targets):
         return torch.mean(torch.abs(inputs - targets))
 
+
+class DTWLoss(nn.Module):
+    """
+    Soft-DTW ?????? ??? ???? DTW ?? ??.
+    ?? ??: (?? ??, ??? ??, ??/?? ?)
+    """
+    def __init__(self, gamma=1.0, normalize=False, use_cuda=True):
+        super(DTWLoss, self).__init__()
+        # GPU? ???? ???? ?? ??? ?????.
+        self.dtw_computer = SoftDTW(use_cuda=use_cuda, gamma=gamma, normalize=normalize)
+
+    def forward(self, pred, true):
+        # ?????? ?? ??? ?? DTW? ? ?? ?????.
+        loss = self.dtw_computer(pred, true)
+        return loss.mean() # ?? ??? ?? ??? ??
+
+
 class dtw_loss(nn.Module):
     def __init__(self, approx=True, gamma=1.0, use_cuda=True):
         super(dtw_loss, self).__init__()
@@ -35,6 +53,13 @@ class dtw_loss(nn.Module):
             self.dtw = SoftDTW(gamma = gamma, dist_func=fun, use_cuda=use_cuda)
         else:
             self.dtw = self.dtw_distance_torch
+    
+    def divergence(self, x, y):
+        loss_xy = self.dtw(x, y)
+        loss_xx = self.dtw(x, x)
+        loss_yy = self.dtw(y, y)
+        divergence = loss_xy - 0.5 * (loss_xx + loss_yy)
+        return divergence.mean()
 
     def dtw_distance_torch(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """
@@ -75,8 +100,10 @@ class dtw_loss(nn.Module):
         return torch.stack(dtw_distances).contiguous().view(B, C).mean(dim=1)  # (B, C)
 
     
-    def forward(self, inputs, targets):
-        return self.dtw(inputs, targets).sum()
+    def forward(self, inputs, targets, div=True):
+        if div:
+            return self.divergence(inputs, targets)
+        return self.dtw(inputs, targets).mean()
 
 
 class AutomaticWeightedLoss(torch.nn.Module):

@@ -52,11 +52,11 @@ def Trainer(model,
     best_performance = None
     for epoch in range(1, args.pretrain_epoch + 1):
 
-        total_loss, total_cl_loss, total_rb_loss, total_sd_loss, total_mae_loss, total_dtw_loss, total_sd_metric= model_pretrain(model, model_optimizer, model_scheduler, train_dl,
+        total_loss, total_cl_loss, total_rb_loss, total_sd_loss, total_mae_loss, total_dtw_loss, total_sd_metric, total_pcc_metirc, total_si_snr= model_pretrain(model, model_optimizer, model_scheduler, train_dl,
                                                                   configs, args, device, loss_mode)
 
         logger.debug(
-            f'Pre-training Epoch: {epoch}\t Train Loss: {total_loss:.4f}\t CL Loss: {total_cl_loss:.4f}\t RB Loss: {total_rb_loss:.4f}\t SD Loss: {total_sd_loss:.4f}\t MAE Loss : {total_mae_loss:.4f} \t DTW Loss: {total_dtw_loss:.4f}\t SD Metric: {total_sd_metric:.4f}\n')
+            f'Pre-training Epoch: {epoch}\t Train Loss: {total_loss:.4f}\t CL Loss: {total_cl_loss:.4f}\t RB Loss: {total_rb_loss:.4f}\t SD Loss: {total_sd_loss:.4f}\t MAE Loss : {total_mae_loss:.4f} \t DTW Loss: {total_dtw_loss:.4f}\t SD Metric: {total_sd_metric:.4f}\t PCC Metric : {total_pcc_metirc}\t SI SNR : {total_si_snr}\n')
 
         chkpoint = {'seed': seed, 'epoch': epoch, 'train_loss': total_loss, 'model_state_dict': model.state_dict()}
         torch.save(chkpoint, os.path.join(experiment_log_dir, f"saved_models/", f'ckp_ep{epoch}.pt'))
@@ -79,7 +79,8 @@ def Trainer(model,
                                                                                                                ft_model_optimizer,
                                                                                                                ft_scheduler,
                                                                                                                classifier=ft_classifier,
-                                                                                                               classifier_optimizer=ft_classifier_optimizer)
+                                                                                                               classifier_optimizer=ft_classifier_optimizer,
+                                                                                                               frozen=False)
 
                 if ep % args.log_epoch == 0:
                     # Test
@@ -119,6 +120,8 @@ def model_pretrain(model, model_optimizer, model_scheduler, train_loader, config
     total_dtw_loss = []
     total_mae_loss = []
     total_sd_metric = []
+    total_pcc_metirc = []
+    total_si_snr     = []
 
     model.train()
     for batch_idx, (data, labels) in enumerate(train_loader):
@@ -131,7 +134,7 @@ def model_pretrain(model, model_optimizer, model_scheduler, train_loader, config
             device)
 
         # Produce embeddings of original and masked samples
-        loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd = model(data_masked_om, pretrain=True)
+        loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr = model(data_masked_om, pretrain=True)
 
         loss.backward()
         model_optimizer.step()
@@ -143,6 +146,8 @@ def model_pretrain(model, model_optimizer, model_scheduler, train_loader, config
         total_mae_loss.append(loss_mae.item())
         total_dtw_loss.append(loss_dtw.item())
         total_sd_metric.append(metric_sd.item())
+        total_pcc_metirc.append(metric_pcc.item())
+        total_si_snr.append(metric_si_snr.item())
 
     total_loss = torch.tensor(total_loss).mean()
     total_cl_loss = torch.tensor(total_cl_loss).mean()
@@ -151,11 +156,13 @@ def model_pretrain(model, model_optimizer, model_scheduler, train_loader, config
     total_mae_loss = torch.tensor(total_mae_loss).mean()
     total_dtw_loss = torch.tensor(total_dtw_loss).mean()
     total_sd_metric = torch.tensor(total_sd_metric).mean()
+    total_pcc_metirc = torch.tensor(total_pcc_metirc).mean()
+    total_si_snr     = torch.tensor(total_si_snr).mean()
 
 
     model_scheduler.step()
 
-    return total_loss, total_cl_loss, total_rb_loss, total_sd_loss, total_mae_loss, total_dtw_loss, total_sd_metric
+    return total_loss, total_cl_loss, total_rb_loss, total_sd_loss, total_mae_loss, total_dtw_loss, total_sd_metric,total_pcc_metirc, total_si_snr
 
 
 def model_finetune(model, val_dl, device, model_optimizer, model_scheduler, classifier=None, classifier_optimizer=None, frozen=True):

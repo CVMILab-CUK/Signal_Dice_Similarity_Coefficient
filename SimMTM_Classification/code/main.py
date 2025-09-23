@@ -33,8 +33,8 @@ parser.add_argument('--pretrain_lr', default=0.0001, type=float, help='pretrain 
 parser.add_argument('--lr', default=0.0001, type=float, help='learning rate')
 parser.add_argument('--use_pretrain_epoch_dir', default=None, type=str,
                     help='choose the pretrain checkpoint to finetune')
-parser.add_argument('--pretrain_epoch', default=20, type=int, help='pretrain epochs')
-parser.add_argument('--finetune_epoch', default=300, type=int, help='finetune epochs')
+parser.add_argument('--pretrain_epoch', default=20, type=int, help='pretrain_epochs')
+parser.add_argument('--finetune_epoch', default=300, type=int, help='finetune_epochs')
 
 parser.add_argument('--masking_ratio', default=0.5, type=float, help='masking ratio')
 parser.add_argument('--positive_nums', default=3, type=int, help='positive series numbers')
@@ -43,7 +43,7 @@ parser.add_argument('--lm', default=3, type=int, help='average masked lenght')
 parser.add_argument('--finetune_result_file_name', default="finetune_result.json", type=str,
                     help='finetune result json name')
 parser.add_argument('--temperature', type=float, default=0.2, help='temperature')
-parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw"]')
+parser.add_argument('--loss_mode', type=str, default='snr', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw"]')
 
 
 
@@ -81,6 +81,9 @@ def main(args, configs, seed=None):
     # Load datasets
     sourcedata_path = f"./dataset/{sourcedata}"  # './data/Epilepsy'
     targetdata_path = f"./dataset/{targetdata}"
+
+    if targetdata == "FD-B" or targetdata == "Epilepsy":
+        configs.target_batch_size = 32
 
     subset = args.subset  # if subset= true, use a subset for debugging.
     train_dl, valid_dl, test_dl = data_generator(sourcedata_path, targetdata_path, configs, training_mode,

@@ -1,7 +1,7 @@
 from torch import nn
 import torch
-from loss import ContrastiveWeight, AggregationRebuild, AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss
-from metrics import SignalDice as SDSC
+from loss import ContrastiveWeight, AggregationRebuild, AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss, DTWLoss
+from metrics import SignalDice as SDSC, pearson_correlation, si_snr
 
 
 class TFC(nn.Module):
@@ -51,7 +51,7 @@ class TFC(nn.Module):
             self.mse  = torch.nn.MSELoss()
             self.sdsc = SignalDiceLoss()
             self.mae  = mae_loss()            
-            self.dtw = dtw_loss(approx=True)
+            self.dtw = DTWLoss()
 
             if self.loss_mode == "hybrid":
                 self.awl = AutomaticWeightedLoss(3)
@@ -59,6 +59,8 @@ class TFC(nn.Module):
                 self.awl = AutomaticWeightedLoss(2)
 
             self.sdsc_metric = SDSC()
+            self.pcc = pearson_correlation
+            self.si_snr = si_snr
 
     def forward(self, x_in_t, pretrain=False):
         if pretrain:
@@ -77,8 +79,15 @@ class TFC(nn.Module):
             loss_rb = self.mse(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
             loss_sd = self.sdsc(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
             loss_mae = self.mae(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
-            loss_dtw = self.dtw(pred_x.unsqueeze(1), x_in_t.reshape(x_in_t.size(0), 1, -1).detach())
+            # loss_dtw = self.dtw(pred_x.unsqueeze(1), x_in_t.reshape(x_in_t.size(0), 1, -1).detach())
+            loss_dtw = torch.tensor([0.,]).to(0)
+            
 
+
+            # metrics 
+            metric_sd     = self.sdsc_metric(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+            metric_pcc    = self.pcc(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+            metric_si_snr = self.si_snr(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
 
             if self.loss_mode == "mse":
                 loss = self.awl(loss_cl, loss_rb)
@@ -88,16 +97,17 @@ class TFC(nn.Module):
                 loss = self.awl(loss_cl, loss_mae)
             elif self.loss_mode == "dtw":
                 loss = self.awl(loss_dtw)
+            elif self.loss_mode == 'pcc':
+                loss = self.awl(loss_cl, (1-metric_pcc))
+            elif self.loss_mode == 'snr':
+                loss = self.awl(loss_cl, -metric_si_snr)
             else:
                 loss = self.awl(loss_cl, loss_rb, loss_sd)
-
-            # metrics 
-            metric_sd = self.sdsc_metric(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
 
             # loss_rb = self.mse(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
             # loss = self.awl(loss_cl, loss_rb)
 
-            return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd
+            return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr
         else:
             x = self.conv_block1(x_in_t)
             x = self.conv_block2(x)
