@@ -1,6 +1,6 @@
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-for loss_mode in mse sdsc hybrid; do
+for loss_mode in pcc snr; do
     python -u run.py \
         --task_name finetune \
         --root_path /media/NAS/1_Datasets/EEG/EEG_benchmark/forecasting/dataset/traffic/ \
@@ -19,7 +19,7 @@ for loss_mode in mse sdsc hybrid; do
         --d_model 128 \
         --d_ff 256 \
         --n_heads 16 \
-        --batch_size 2 \
+        --batch_size 8\
         --dropout 0.2\
         --use_multi_gpu \
         --loss_mode $loss_mode\

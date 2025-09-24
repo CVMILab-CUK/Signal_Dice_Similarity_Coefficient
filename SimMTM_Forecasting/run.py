@@ -165,7 +165,7 @@ elif args.task_name == 'finetune':
             args.learning_rate
         )
 
-        args.load_checkpoints = os.path.join(args.pretrain_checkpoints, args.data, args.transfer_checkpoints)
+        args.load_checkpoints = os.path.join(args.pretrain_checkpoints, args.data, args.loss_mode, args.transfer_checkpoints)
 
         exp = Exp(args)  # set experiments
 
@@ -173,5 +173,5 @@ elif args.task_name == 'finetune':
         exp.train(setting)
 
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-        exp.test()
+        exp.test(f"{args.data}_{args.loss_mode}")
         torch.cuda.empty_cache()
