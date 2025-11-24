@@ -80,16 +80,15 @@ class Model(nn.Module):
             # for series-wise representation
             self.pooler = Pooler_Head(configs.seq_len, configs.d_model, head_dropout=configs.head_dropout)
 
-
             self.contrastive = ContrastiveWeight(self.configs)
             self.aggregation = AggregationRebuild(self.configs)
             self.mse  = torch.nn.MSELoss()
-            self.sdsc = SignalDiceLoss()
+            self.sdsc = SignalDiceLoss(alpha=self.configs.alpha)
             self.mae  = mae_loss()
             self.pcc = pearson_correlation
             self.si_snr = si_snr
-            # self.dtw = dtw_loss(approx=True)
-            self.dtw = DTWLoss()
+            self.dtw = dtw_loss(approx=True, use_cuda=False)
+            # self.dtw = DTWLoss()
             
             if self.configs.loss_mode == "hybrid":
                 self.awl = AutomaticWeightedLoss(3)
@@ -225,8 +224,9 @@ class Model(nn.Module):
         loss_rb = self.mse(pred_batch_x, batch_x.detach())
         loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
         loss_mae = self.mae(pred_batch_x, batch_x.detach())
-        # loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
-        loss_dtw = torch.tensor([0.]).to(0)
+        loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
+        # print("loss")
+        # loss_dtw = torch.tensor([0.]).to(0)
 
 
         # metrics 
@@ -251,10 +251,12 @@ class Model(nn.Module):
             loss = self.awl(loss_cl, (-metric_si_snr))
         else:
             loss = self.awl(loss_cl, loss_rb, loss_sd)
+            # loss = loss_cl + 0.5*loss_rb + 0.5*loss_sd
         
 
         return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc,  metric_si_snr, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
-
+    
+    
     def forward(self, x_enc, x_mark_enc, batch_x=None, mask=None):
 
         if self.task_name == 'pretrain':

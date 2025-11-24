@@ -90,7 +90,8 @@ parser.add_argument('--masked_rule', type=str, default='geometric', help='geomet
 parser.add_argument('--mask_rate', type=float, default=0.5, help='mask ratio')
 
 # Pre-train loss mode
-parser.add_argument('--loss_mode', type=str, default='snr', help='pretrain loss mode. ["mse", "sdsc", "hybird"]')
+parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybird"]')
+parser.add_argument('--alpha', type=int, default=None, help='Approx parameters')
 
 args = parser.parse_args()
 args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
@@ -104,7 +105,7 @@ print('Args in experiment:')
 print(args)
 
 # Check Loss mode
-assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw', 'con', 'pcc', 'snr'], f"Check your Loss mode we only support 'mse','sdsc','hybird' 'mae' and 'dtw', now : {args.loss_mode}"
+assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw', 'con', 'pcc', 'snr', 'freeze','softdtw', '1', '10','100'], f"Check your Loss mode we only support 'mse','sdsc','hybird' 'mae' and 'dtw', now : {args.loss_mode}"
 
 Exp = Exp_SimMTM
 if args.task_name == 'pretrain':
@@ -134,6 +135,7 @@ if args.task_name == 'pretrain':
             args.mask_rate,
             args.temperature,
             args.loss_mode,
+            args.alpha
         )
 
         exp = Exp(args)  # set experiments

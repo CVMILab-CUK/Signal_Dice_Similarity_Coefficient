@@ -62,7 +62,7 @@ class Exp_SimMTM(Exp_Basic):
         self.train_show = next(iter(train_loader))
         self.valid_show = next(iter(vali_loader))
 
-        path = os.path.join(self.args.pretrain_checkpoints, self.args.data)
+        path = os.path.join(self.args.pretrain_checkpoints, self.args.data, self.args.alpha) if self.alpha  else  os.path.join(self.args.pretrain_checkpoints, self.args.data)
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -140,6 +140,7 @@ class Exp_SimMTM(Exp_Basic):
 
                 self.show(5, epoch + 1, 'train')
                 self.show(5, epoch + 1, 'valid')
+
 
     def pretrain_one_epoch(self, train_loader, model_optim, model_scheduler):
 

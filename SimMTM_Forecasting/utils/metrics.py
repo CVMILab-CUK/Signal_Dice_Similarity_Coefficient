@@ -5,9 +5,11 @@ import torch.nn.functional as F
 
 
 class SignalDice(nn.Module):
-    def __init__(self, eps=1e-6):
+    def __init__(self, alpha=None, eps=1e-6):
         super(SignalDice,self).__init__()
         self.eps = eps
+        self.alpha = alpha
+        self.sig   = nn.Sigmoid() 
     
     def calc_inter(self, a, b, same_sign_mat):
         a = a * same_sign_mat
@@ -25,7 +27,10 @@ class SignalDice(nn.Module):
 
         # Make Heaviside Matrix
         with torch.no_grad():
-            same_sign_mat = torch.heaviside(inputs * targets, torch.tensor([0.], device=device))
+            if self.alpha:
+                same_sign_mat = self.sig(inputs * targets*self.alpha)
+            else:
+                same_sign_mat = torch.heaviside(inputs * targets, torch.tensor([0.], device=device))
 
         self.intersection = self.calc_inter(in_abs, tar_abs, same_sign_mat) 
         self.union        = self.calc_union(in_abs, tar_abs)

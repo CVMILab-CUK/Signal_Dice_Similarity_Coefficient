@@ -43,7 +43,8 @@ parser.add_argument('--lm', default=3, type=int, help='average masked lenght')
 parser.add_argument('--finetune_result_file_name', default="finetune_result.json", type=str,
                     help='finetune result json name')
 parser.add_argument('--temperature', type=float, default=0.2, help='temperature')
-parser.add_argument('--loss_mode', type=str, default='snr', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw"]')
+parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw"]')
+parser.add_argument('--alpha', type=int, default=None, help='Approx Alpha')
 
 
 
@@ -101,7 +102,7 @@ def main(args, configs, seed=None):
     os.makedirs(experiment_log_dir, exist_ok=True)
 
     # Logging
-    log_file_name = os.path.join(experiment_log_dir, f"logs_{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}.log")
+    log_file_name = os.path.join(experiment_log_dir, f"logs_{datetime.now().strftime('%d_%m_%Y_%H_%M_%S')}_{args.alpha}.log")
     logger = _logger(log_file_name)
     logger.debug("=" * 45)
     logger.debug(f'Pre-training Dataset: {sourcedata}')
@@ -125,6 +126,9 @@ def main(args, configs, seed=None):
                                        weight_decay=0)
     model_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=model_optimizer, T_max=pretrain_epoch)
 
+    if training_mode == 'bench_mark':
+        model.bench_mark()
+        return 0
     # Trainer
     best_performance = Trainer(model, model_optimizer, model_scheduler, train_dl, valid_dl, test_dl, device, logger,
                                args, configs, experiment_log_dir, seed, loss_mode)

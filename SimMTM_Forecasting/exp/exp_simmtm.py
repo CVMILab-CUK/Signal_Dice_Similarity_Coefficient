@@ -20,8 +20,10 @@ warnings.filterwarnings('ignore')
 class Exp_SimMTM(Exp_Basic):
     def __init__(self, args):
         super(Exp_SimMTM, self).__init__(args)
-        self.writer = SummaryWriter(f"./outputs/logs/{args.data}")
+        self.writer = SummaryWriter(f"./outputs/logs/{args.data}/{args.alpha}")
         self.patience = 5
+
+
 
     def _build_model(self):
         model = self.model_dict[self.args.model].Model(self.args).float()
@@ -62,8 +64,7 @@ class Exp_SimMTM(Exp_Basic):
         # show cases
         self.train_show = next(iter(train_loader))
         self.valid_show = next(iter(vali_loader))
-
-        path = os.path.join(self.args.pretrain_checkpoints, self.args.data)
+        path = os.path.join(self.args.pretrain_checkpoints, self.args.data, str(self.args.alpha)) if self.args.alpha else os.path.join(self.args.pretrain_checkpoints, self.args.data)
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -151,6 +152,10 @@ class Exp_SimMTM(Exp_Basic):
 
             if earlystopping_counts == self.patience:
                 break
+    
+
+
+
     def pretrain_one_epoch(self, train_loader, model_optim, model_scheduler):
 
         train_loss = []

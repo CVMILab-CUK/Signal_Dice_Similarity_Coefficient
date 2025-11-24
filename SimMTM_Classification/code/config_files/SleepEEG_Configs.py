@@ -32,7 +32,7 @@ class Config(object):
 
         # data parameters
         self.drop_last = True
-        self.batch_size = 32
+        self.batch_size = 256
 
         """For Epilepsy, the target batchsize is 60"""
         self.target_batch_size = 64   # the size of target dataset (the # of samples used to fine-tune).

@@ -21,6 +21,7 @@ python -u run.py \
     --learning_rate 0.001 \
     --batch_size 32 \
     --train_epochs 50 \
-    --use_multi_gpu
+    --use_multi_gpu \
+    --loss_mode hybrid
 
 

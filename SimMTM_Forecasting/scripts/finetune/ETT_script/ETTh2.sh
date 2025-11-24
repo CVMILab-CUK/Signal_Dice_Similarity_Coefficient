@@ -1,6 +1,6 @@
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-for loss_mode in pcc snr; do
+for loss_mode in softdtw freeze; do
     python -u run.py \
         --task_name finetune \
         --is_training 1 \

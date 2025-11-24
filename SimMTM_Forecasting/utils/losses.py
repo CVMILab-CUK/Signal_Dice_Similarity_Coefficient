@@ -13,9 +13,9 @@ from .soft_dtw_cuda import SoftDTW
 
 class SignalDiceLoss(nn.Module):
 
-    def __init__(self,  eps=1e-6):
+    def __init__(self,  alpha = None, eps=1e-6):
         super(SignalDiceLoss, self).__init__()
-        self.sdsc = SignalDice(eps)
+        self.sdsc = SignalDice(eps=eps, alpha=alpha)
         self.eps  = eps
     
     def forward(self, inputs, targets):

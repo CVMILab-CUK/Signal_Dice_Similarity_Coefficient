@@ -11,9 +11,9 @@ from metrics import SignalDice
 
 class SignalDiceLoss(nn.Module):
 
-    def __init__(self,  eps=1e-6):
+    def __init__(self,  eps=1e-6, alpha=None):
         super(SignalDiceLoss, self).__init__()
-        self.sdsc = SignalDice(eps)
+        self.sdsc = SignalDice(eps, alpha=alpha)
         self.eps  = eps
     
     def forward(self, inputs, targets):
