@@ -1,11 +1,17 @@
 # Pre-registration commit-hash gate (AC-11)
 
-REPO_HEAD: acdc17eb8129c319da20729996188a2af04e9b79
-ISO_TIMESTAMP: 2025-11-25T00:57:39+09:00
-FROZEN_AT: 2026-06-02T15:22:45+00:00
+REPO_HEAD: 76f30644fa06f76bf2cc55ae0b7921a03fc3fd48
+ISO_TIMESTAMP: 2026-06-02T15:25:57+00:00
+FROZEN_AT: 2026-06-02T15:26:21+00:00
 PROTOCOL_VERSION: plan-v5-pending-approval
+SDSC_CANONICAL_TAG: sdsc-canonical-v1
 
-# This file freezes the protocol/ subdir state at iteration-5 approval moment.
-# V1 analysis notebook reads this hash and aborts if 'git rev-parse HEAD:paper_supplement/protocol/' differs from REPO_HEAD's protocol/ tree hash.
-PROTOCOL_TREE_HASH: HEAD:paper_supplement/protocol/
-not-committed-yet
+# This file freezes the protocol/ subdir state.
+# V1 analysis notebook MUST read this hash and abort if the current
+# 'git rev-parse HEAD:paper_supplement/protocol/' differs from
+# PROTOCOL_TREE_HASH below.
+PROTOCOL_TREE_HASH: 1b6e17dfc1994ecb393d81ef5684526c3e9aacb8
+
+# Test fixture: how to verify the gate
+# $ git rev-parse HEAD:paper_supplement/protocol/
+# Expected: 1b6e17dfc1994ecb393d81ef5684526c3e9aacb8 (until next protocol/ edit)
