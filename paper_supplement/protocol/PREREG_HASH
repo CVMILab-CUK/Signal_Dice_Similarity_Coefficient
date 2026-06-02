@@ -1,0 +1,11 @@
+# Pre-registration commit-hash gate (AC-11)
+
+REPO_HEAD: acdc17eb8129c319da20729996188a2af04e9b79
+ISO_TIMESTAMP: 2025-11-25T00:57:39+09:00
+FROZEN_AT: 2026-06-02T15:22:45+00:00
+PROTOCOL_VERSION: plan-v5-pending-approval
+
+# This file freezes the protocol/ subdir state at iteration-5 approval moment.
+# V1 analysis notebook reads this hash and aborts if 'git rev-parse HEAD:paper_supplement/protocol/' differs from REPO_HEAD's protocol/ tree hash.
+PROTOCOL_TREE_HASH: HEAD:paper_supplement/protocol/
+not-committed-yet

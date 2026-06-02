@@ -4,6 +4,14 @@ import numpy as np
 import torch.nn.functional as F
 
 
+# DEPRECATED — see utils/sdsc_canonical.SignalDiceCanonical for the canonical
+# AAAI27 implementation. Differences from canonical:
+#   1. Reduction is GLOBAL sum (line 38, no dim=-1) instead of per-sequence.
+#   2. Soft path (alpha != None) runs under torch.no_grad() — gradient through
+#      the sign gate is silently blocked (latent bug). Use canonical for any
+#      loss / training use.
+# This class is preserved for bit-identity with the 200-cell exploratory grid
+# (multi_sweep_v1/v5/v6 results were computed with this code). Do not modify.
 class SignalDice(nn.Module):
     def __init__(self, alpha=None, eps=1e-6):
         super(SignalDice,self).__init__()

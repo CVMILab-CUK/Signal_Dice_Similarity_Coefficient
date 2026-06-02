@@ -1,6 +1,11 @@
 import torch
 import torch.nn as nn
 
+
+# DEPRECATED — see SimMTM_Forecasting/utils/sdsc_canonical.SignalDiceCanonical
+# for the canonical AAAI27 implementation. This class uses H(0)=1; canonical
+# uses H(0)=0. SoftSignalDice below differs further on alpha placement.
+# Preserved for repo-history reference; do not import for new code.
 class SignalDice(nn.Module):
     def __init__(self, eps=1e-6):
         super(SignalDice,self).__init__()
