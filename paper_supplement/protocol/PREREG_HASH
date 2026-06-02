@@ -1,17 +1,34 @@
-# Pre-registration commit-hash gate (AC-11)
+# Pre-registration freeze marker (AC-11)
 
-REPO_HEAD: 76f30644fa06f76bf2cc55ae0b7921a03fc3fd48
-ISO_TIMESTAMP: 2026-06-02T15:25:57+00:00
-FROZEN_AT: 2026-06-02T15:26:21+00:00
-PROTOCOL_VERSION: plan-v5-pending-approval
-SDSC_CANONICAL_TAG: sdsc-canonical-v1
+# Scientific claim:
+#   The protocol/ subdir contents were committed BEFORE any V1 result is
+#   computed. The git timeline is the falsifiable evidence — any post-result
+#   edit shifts the protocol/ commit timestamp and can be detected.
 
-# This file freezes the protocol/ subdir state.
-# V1 analysis notebook MUST read this hash and abort if the current
-# 'git rev-parse HEAD:paper_supplement/protocol/' differs from
-# PROTOCOL_TREE_HASH below.
-PROTOCOL_TREE_HASH: 1b6e17dfc1994ecb393d81ef5684526c3e9aacb8
+# Freeze tag:        sdsc-canonical-v1
+# Canonical commit:  76f30644fa06f76bf2cc55ae0b7921a03fc3fd48
+# Freeze ISO:        2026-06-02 (Asia/Seoul timezone)
+# Plan version:      plan-v5 (pending approval — see ../AAAI27_metric_validation_plan.md)
 
-# Test fixture: how to verify the gate
-# $ git rev-parse HEAD:paper_supplement/protocol/
-# Expected: 1b6e17dfc1994ecb393d81ef5684526c3e9aacb8 (until next protocol/ edit)
+# Gate semantics for V1 analysis notebook:
+#   1. Verify the tag exists: `git rev-parse --verify sdsc-canonical-v1` succeeds
+#   2. Verify protocol/ contents are committed (clean working tree on protocol/):
+#      `git diff --quiet HEAD -- paper_supplement/protocol/` returns 0
+#   3. Verify the canonical commit is reachable from current HEAD:
+#      `git merge-base --is-ancestor 76f30644fa06f76bf2cc55ae0b7921a03fc3fd48 HEAD`
+#   4. If any of 1-3 fails, abort the V1 run with the failing condition logged.
+
+# Why this is honest pre-registration:
+#   - The canonical commit hash is locked: it is the commit where canonical SDSC
+#     and protocol/ scaffold first landed.
+#   - Any post-hoc edit to protocol/ produces a NEW commit; the canonical commit
+#     hash on this line stays frozen, so a reviewer can `git diff
+#     76f30644...HEAD -- paper_supplement/protocol/` and see exactly what was
+#     added or modified after freeze.
+#   - The git timeline is the proof, not a chicken-and-egg tree hash.
+
+# Test of the gate (manual):
+#   $ git rev-parse --verify sdsc-canonical-v1
+#   $ git merge-base --is-ancestor 76f30644fa06f76bf2cc55ae0b7921a03fc3fd48 HEAD
+#   $ git diff --quiet HEAD -- paper_supplement/protocol/
+#   All three should exit 0 for the gate to be VALID.
