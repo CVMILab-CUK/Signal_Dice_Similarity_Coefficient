@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Frozen list of 60 cell-runs that constitute the AC-6 loss-neutrality statistical anchor. See AAAI27 plan v5 AC-6 (Δ8) and M3 pilot results.",
+  "frozen_at": "2026-06-08",
+  "freeze_tag": "sdsc-canonical-v1",
+  "canonical_commit": "76f30644fa06f76bf2cc55ae0b7921a03fc3fd48",
+  "prereg_gate_file": "paper_supplement/protocol/PREREG_HASH",
+  "stratification_rationale": "3 most-divergent losses on ETTh1 (MSE baseline, SDSC our claim, ZCR most catastrophic per 200-cell grid) × 2 representative datasets (ETTh1 small/structured, Weather medium/multivariate) × 2 backbones representing distinct architectural families (SimMTM self-supervised TF, DLinear linear). 5 seeds at N=5.",
+  "config": {
+    "losses": ["mse", "sdsc", "zcr"],
+    "datasets": ["ETTh1", "Weather"],
+    "backbones": ["SimMTM", "DLinear"],
+    "seeds_primary": [42, 123, 2024, 7, 1729],
+    "seeds_escalation": [2025, 360, 911]
+  },
+  "expected_total_runs_primary": 60,
+  "expected_total_runs_escalation_max": 96,
+  "tost_specification": {
+    "equivalence_margin_mse_pct": 0.5,
+    "rationale": "Plan v5 originally registered ±1.4% MSE based on σ=0.7% assumption. M3 pilot measured σ=0.265% on (ETTh1, SimMTM, mse). MDE at N=5, σ=0.265%, α=0.05, power=0.8 ≈ 0.235% MSE. Paper claim tightened to ±0.5% MSE with comfortable headroom.",
+    "multiple_comparison_correction": "Benjamini-Hochberg FDR at q=0.05",
+    "alpha": 0.05,
+    "power_target": 0.8
+  },
+  "escalation_rules": {
+    "per_cell_std_pct_threshold": 0.7,
+    "escalate_to_n_seeds": 8,
+    "bayesian_fallback_trigger_pct_of_cells_escalated": 25,
+    "bayesian_fallback_framework": "NumPyro informative priors; documented in Appendix C"
+  },
+  "cells": [
+    {"id": "mse_ETTh1_SimMTM",    "loss": "mse",  "dataset": "ETTh1",   "backbone": "SimMTM",  "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "mse_ETTh1_DLinear",   "loss": "mse",  "dataset": "ETTh1",   "backbone": "DLinear", "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "mse_Weather_SimMTM",  "loss": "mse",  "dataset": "Weather", "backbone": "SimMTM",  "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "mse_Weather_DLinear", "loss": "mse",  "dataset": "Weather", "backbone": "DLinear", "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "sdsc_ETTh1_SimMTM",    "loss": "sdsc", "dataset": "ETTh1",   "backbone": "SimMTM",  "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "sdsc_ETTh1_DLinear",   "loss": "sdsc", "dataset": "ETTh1",   "backbone": "DLinear", "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "sdsc_Weather_SimMTM",  "loss": "sdsc", "dataset": "Weather", "backbone": "SimMTM",  "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "sdsc_Weather_DLinear", "loss": "sdsc", "dataset": "Weather", "backbone": "DLinear", "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "zcr_ETTh1_SimMTM",    "loss": "zcr",  "dataset": "ETTh1",   "backbone": "SimMTM",  "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "zcr_ETTh1_DLinear",   "loss": "zcr",  "dataset": "ETTh1",   "backbone": "DLinear", "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "zcr_Weather_SimMTM",  "loss": "zcr",  "dataset": "Weather", "backbone": "SimMTM",  "seeds": [42, 123, 2024, 7, 1729]},
+    {"id": "zcr_Weather_DLinear", "loss": "zcr",  "dataset": "Weather", "backbone": "DLinear", "seeds": [42, 123, 2024, 7, 1729]}
+  ],
+  "compute_budget": {
+    "estimated_wallclock_min_per_run": 50,
+    "estimated_total_gpu_hours_primary": 50,
+    "estimated_total_gpu_hours_escalation_buffer": 38,
+    "available_gpu_hours_in_window": 336,
+    "buffer_fraction": 0.38
+  },
+  "deviation_from_plan_v5": "Plan v5 AC-6 originally specified equivalence margin ±2% MSE. Tightened to ±0.5% post-M3 pilot. All other parameters (12 configs, N=5 primary, seeds, escalation rules) unchanged."
+}
