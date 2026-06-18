@@ -43,7 +43,7 @@ parser.add_argument('--lm', default=3, type=int, help='average masked lenght')
 parser.add_argument('--finetune_result_file_name', default="finetune_result.json", type=str,
                     help='finetune result json name')
 parser.add_argument('--temperature', type=float, default=0.2, help='temperature')
-parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw"]')
+parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybrid", "mae", "dtw", "pcc", "snr", "zcr"]')
 parser.add_argument('--alpha', type=int, default=None, help='Approx Alpha')
 
 

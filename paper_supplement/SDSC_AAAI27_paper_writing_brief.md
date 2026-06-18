@@ -518,6 +518,108 @@ Before clicking submit:
 
 ---
 
-**Brief ends.** Total page-density estimate: this brief is ~25 pages but reduces to ~8 page AAAI submission via the structure outline in Section 10. All numbers in Sections 5 are verified from raw `*_score.txt` files as of 2026-06-08.
+---
+
+## 15. Classification Confirmatory Section (NEW per ralplan iter 2 Plan B++)
+
+Added 2026-06-17 after the forecasting evidence completed. This section is the **AAAI27 Section 7** content. Treat all numbers in 15.2 as `[NEEDS CONFIRMATION: pending Week 5 sweep results]` until the analyze_classification.py output lands at `paper_supplement/protocol/classification_results_summary.md`.
+
+### 15.1 Why this section exists
+
+Three prior rejections all cited classification-side weaknesses (memorized verbatim):
+- ICML bwZj W2: "classification benchmark 2개뿐 (Table 21 degenerate identical scores)"
+- ICML 4Zmu / bwZj: "in-domain frozen-encoder classification에서만 분명한 우위"
+- ICLR QVmd: "cross-domain 모순 — SDSC < MSE on cross-domain"
+
+Plan B++ adds a **1.5-page Section 7** + **0.5-page Appendix B** that directly responds to all three. Pre-registered protocol at `paper_supplement/protocol/classification_protocol.md` (freeze tag `sdsc-canonical-v5`).
+
+### 15.2 Section 7 outline (to be filled in Week 5-6)
+
+```markdown
+## 7. Classification Confirmation (1.5 pages)
+
+### 7.1 Setup
+- Backbone: TFC (Zhang et al., NeurIPS 2022)
+- In-domain targets: Epilepsy, Gesture, HAR (3 datasets)
+- Cross-domain transfer pairs: SleepEEG→Epilepsy, SleepEEG→Gesture, ECG→Epilepsy
+  (3 pairs spanning 2 source modalities: EEG and cardiac)
+- Losses: MSE, SDSC, ZCR (matches AC-6 anchor tertile)
+- Seeds: {42, 123, 2024} (shared with AC-6 for cross-track comparability)
+- 54 runs total, single RTX 6000 Ada, ~3 days compute
+
+### 7.2 In-domain results (Table 7) [PLACEHOLDER]
+- per-(target, loss) accuracy mean ± std
+- AC-CL-2 ZCR catastrophic check: cite from classification_results_summary.md
+- AC-CL-3 Loss-neutrality check: cite from classification_results_summary.md
+
+### 7.3 Cross-domain transfer (Table 8) [PLACEHOLDER]
+- per-(source, target, loss) accuracy mean ± std
+- AC-CL-4 TOST equivalence at ±3% accuracy margin
+- Direct address of ICML bwZj Table 21 degeneracy: non-degenerate scores across 3 loss modes
+
+### 7.4 Interpretation
+- "Loss-neutrality observed in forecasting (Sec 4 + AC-6) also holds in classification…"
+- "ZCR's catastrophic degradation observed in forecasting (Sec 4.2) is confirmed cross-task…"
+- "Cross-domain SDSC ≈ MSE under ±3% margin — addresses ICLR QVmd objection without retracting any forecasting claim…"
+```
+
+### 15.3 Page-budget impact (AC-CL-5)
+
+Sec 7 + App B adds 2.0 pages. Existing forecasting page allocation (from Sec 10) gets restructured:
+
+| Original Sec | New allocation |
+|---|---|
+| Sec 4 main 200-cell grid table (1.0p) | → **Appendix A** (1p saved in main) |
+| Sec 6 Discussion (1.0p) | → **0.5p** (0.5p saved) |
+| **Total saved**: 1.5p | Used by Sec 7 (1.5p text) |
+| Appendix budget: was 5 pages | +0.5p for Appendix B |
+
+Writer must measure during Week 6 pass. If overflow, Sec 7.3 can shrink to 0.3p with Table 8 → App B.
+
+### 15.4 Conditional language
+
+The 4 honesty triggers in `classification_protocol.md` Section "Falsification gates" must be honored:
+
+| If observed | Writer must say |
+|---|---|
+| AC-CL-2 fails (ZCR drops > 5% on only 1/3 in-domain) | "ZCR's classification degradation is dataset-dependent" |
+| AC-CL-3 fails (|SDSC−MSE| > 3% on any in-domain) | "Loss-neutrality tightens in classification" |
+| AC-CL-4 fails (TOST rejects on > 1 of 3 cross-domain pairs) | "Cross-domain transfer remains the harder case" |
+| SleepEEG-subset tripwire (AC-CL-6) triggered | Document subset commit-hash in Sec 7.1 |
+
+NEVER write "Classification proves SDSC superior" or any forbidden-token variant. The framing must remain **"forecasting evidence is confirmed cross-task"**, not "classification adds a new win".
+
+### 15.5 Reuse of forecasting infrastructure
+
+Classification track shares:
+- Canonical SDSC implementation: `SimMTM_Classification/code/loss.py:SignalDiceLoss` (already uses `metrics.SignalDice`)
+- DiffZCRLoss baseline: `SimMTM_Classification/code/loss.py:DiffZCRLoss` (mirrors `SimMTM_Forecasting/utils/baselines/zcr_diff.py`)
+- TOST + BH-FDR analysis pipeline: `paper_supplement/scripts/analyze_classification.py` (parallel to AC-6 analyzer)
+- Seed list {42, 123, 2024}: shared with AC-6 anchor
+
+### 15.6 Sweep driver invocation (for reference)
+
+```bash
+cd /root/jeyoung/codes/Signal_Dice_Similarity_Coefficient
+nohup /usr/bin/python3 -u paper_supplement/scripts/run_classification.py \
+  --gpu 0 \
+  > paper_supplement/scripts/classification_sweep.log 2>&1 &
+# ~3 days compute; results land in SimMTM_Classification/outputs/classification_sweep/
+# Then: /usr/bin/python3 paper_supplement/scripts/analyze_classification.py
+```
+
+### 15.7 Writer checklist for Section 7
+
+- [ ] Sec 7.1 setup text fits in 0.4 page
+- [ ] Sec 7.2 in-domain table + AC-CL-2/3 verdicts in 0.5 page
+- [ ] Sec 7.3 cross-domain table + AC-CL-4 verdict in 0.4 page
+- [ ] Sec 7.4 interpretation tied to Sec 4 forecasting claims in 0.2 page
+- [ ] Appendix B per-cell results table (54 rows) in 0.5 page
+- [ ] No forbidden tokens in Sec 7 text (run final-pass lint)
+- [ ] Cite `classification_protocol.md` commit hash for pre-registration provenance
+
+---
+
+**Brief ends.** Total page-density estimate: this brief is ~30 pages but reduces to ~8 page AAAI submission via the structure outline in Section 10 + new Section 7 from Section 15. All numbers in Section 5 verified from raw `*_score.txt` files as of 2026-06-08. Classification numbers pending Week 5 sweep results (placeholder marked).
 
 If the writer hits an ambiguity not resolved here, do not fabricate. Either query the author (`dlwpdud@gmail.com`, Korean OK) or mark with `[NEEDS CONFIRMATION: ...]` in the draft.

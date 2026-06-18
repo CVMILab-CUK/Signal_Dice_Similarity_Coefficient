@@ -9,13 +9,29 @@ from utils.soft_dtw_cuda import SoftDTW
 from torch import nn
 from metrics import SignalDice
 
+
+# AAAI27 Classification Confirmatory (Plan B++ AC-CL-2):
+# DiffZCRLoss is the published soft-sign relaxation (tanh) baseline matching
+# the V1 forecasting baseline at SimMTM_Forecasting/utils/baselines/zcr_diff.py.
+# Used in classification pretrain to test C4 (ZCR catastrophic) cross-task.
+class DiffZCRLoss(nn.Module):
+    def __init__(self, alpha: float = 10.0):
+        super().__init__()
+        self.alpha = alpha
+
+    def forward(self, pred, target):
+        p_sign = torch.tanh(self.alpha * pred)
+        t_sign = torch.tanh(self.alpha * target)
+        return torch.mean((p_sign - t_sign) ** 2)
+
+
 class SignalDiceLoss(nn.Module):
 
     def __init__(self,  eps=1e-6, alpha=None):
         super(SignalDiceLoss, self).__init__()
         self.sdsc = SignalDice(eps, alpha=alpha)
         self.eps  = eps
-    
+
     def forward(self, inputs, targets):
         sdsc_value = self.sdsc(inputs, targets)
         return 1 - sdsc_value

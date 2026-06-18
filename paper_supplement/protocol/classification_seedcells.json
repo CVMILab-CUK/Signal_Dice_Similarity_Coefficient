@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Frozen 54-run classification sweep for AAAI27 Sec 7 Confirmatory. See classification_protocol.md.",
+  "frozen_at": "2026-06-17",
+  "freeze_tag": "sdsc-canonical-v5",
+  "canonical_commit": "76f30644fa06f76bf2cc55ae0b7921a03fc3fd48",
+  "prereg_gate_file": "paper_supplement/protocol/PREREG_HASH",
+  "stratification_rationale": "3 in-domain datasets {Epilepsy, Gesture, HAR} + 3 cross-domain transfer pairs {SleepEEG->Epilepsy, SleepEEG->Gesture, ECG->Epilepsy}. 3 losses {MSE, SDSC, ZCR} chosen as most-divergent tertile (matches AC-6 anchor for cross-track comparability). 1 backbone (TFC pre-existing). 3 seeds {42, 123, 2024} shared with AC-6.",
+  "config": {
+    "losses": ["mse", "sdsc", "zcr"],
+    "in_domain_targets": ["Epilepsy", "Gesture", "HAR"],
+    "cross_domain_pairs": [
+      {"source": "SleepEEG", "target": "Epilepsy"},
+      {"source": "SleepEEG", "target": "Gesture"},
+      {"source": "ECG", "target": "Epilepsy"}
+    ],
+    "backbone": "TFC",
+    "seeds": [42, 123, 2024]
+  },
+  "expected_total_runs": 54,
+  "tost_specification": {
+    "cross_domain_margin_acc_pct": 3.0,
+    "in_domain_loss_neutrality_margin_pct": 1.0,
+    "zcr_catastrophic_threshold_pct": 5.0,
+    "multiple_comparison_correction": "Benjamini-Hochberg FDR at q=0.05"
+  },
+  "tripwires": {
+    "sleep_eeg_subset_trigger": {
+      "epoch_time_min": 30,
+      "memory_gb": 40,
+      "subset_size": 50000,
+      "subset_seed": 42
+    }
+  },
+  "in_domain_cells": [
+    {"id": "indomain_mse_Epilepsy", "loss": "mse",  "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "indomain_sdsc_Epilepsy","loss": "sdsc", "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "indomain_zcr_Epilepsy", "loss": "zcr",  "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "indomain_mse_Gesture",  "loss": "mse",  "target": "Gesture",  "seeds": [42, 123, 2024]},
+    {"id": "indomain_sdsc_Gesture", "loss": "sdsc", "target": "Gesture",  "seeds": [42, 123, 2024]},
+    {"id": "indomain_zcr_Gesture",  "loss": "zcr",  "target": "Gesture",  "seeds": [42, 123, 2024]},
+    {"id": "indomain_mse_HAR",      "loss": "mse",  "target": "HAR",      "seeds": [42, 123, 2024]},
+    {"id": "indomain_sdsc_HAR",     "loss": "sdsc", "target": "HAR",      "seeds": [42, 123, 2024]},
+    {"id": "indomain_zcr_HAR",      "loss": "zcr",  "target": "HAR",      "seeds": [42, 123, 2024]}
+  ],
+  "cross_domain_cells": [
+    {"id": "xdomain_mse_SleepEEG__Epilepsy",  "loss": "mse",  "source": "SleepEEG", "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "xdomain_sdsc_SleepEEG__Epilepsy", "loss": "sdsc", "source": "SleepEEG", "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "xdomain_zcr_SleepEEG__Epilepsy",  "loss": "zcr",  "source": "SleepEEG", "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "xdomain_mse_SleepEEG__Gesture",   "loss": "mse",  "source": "SleepEEG", "target": "Gesture",  "seeds": [42, 123, 2024]},
+    {"id": "xdomain_sdsc_SleepEEG__Gesture",  "loss": "sdsc", "source": "SleepEEG", "target": "Gesture",  "seeds": [42, 123, 2024]},
+    {"id": "xdomain_zcr_SleepEEG__Gesture",   "loss": "zcr",  "source": "SleepEEG", "target": "Gesture",  "seeds": [42, 123, 2024]},
+    {"id": "xdomain_mse_ECG__Epilepsy",       "loss": "mse",  "source": "ECG",      "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "xdomain_sdsc_ECG__Epilepsy",      "loss": "sdsc", "source": "ECG",      "target": "Epilepsy", "seeds": [42, 123, 2024]},
+    {"id": "xdomain_zcr_ECG__Epilepsy",       "loss": "zcr",  "source": "ECG",      "target": "Epilepsy", "seeds": [42, 123, 2024]}
+  ],
+  "compute_budget": {
+    "estimated_in_domain_min_per_run": 40,
+    "estimated_cross_domain_min_per_run": 120,
+    "estimated_total_gpu_hours": 75,
+    "available_gpu_hours_in_week": 168,
+    "buffer_fraction": 0.55
+  },
+  "ralplan_provenance": {
+    "iteration": 2,
+    "architect_verdict": "STRENGTHEN (cross-domain addition + page-budget plan)",
+    "critic_verdict": "ITERATE → 6 AC tightenings applied",
+    "critic_acs_applied": [
+      "AC-CL-1: frozen seedcells",
+      "AC-CL-2: ZCR threshold 5% on >=2/3",
+      "AC-CL-3: loss-neutrality threshold 1% on all 3",
+      "AC-CL-4: TOST +/-3% acc",
+      "AC-CL-5: page allocation 1.5p+0.5p",
+      "AC-CL-6: SleepEEG-subset tripwire (NOT in-domain fallback)",
+      "AC-CL-7: 3rd source domain (ECG)"
+    ]
+  }
+}

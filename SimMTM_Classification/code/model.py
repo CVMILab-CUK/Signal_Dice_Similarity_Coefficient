@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from loss import ContrastiveWeight, AggregationRebuild, AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss, DTWLoss
+from loss import ContrastiveWeight, AggregationRebuild, AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss, DTWLoss, DiffZCRLoss
 from metrics import SignalDice as SDSC, pearson_correlation, si_snr
 
 
@@ -51,8 +51,9 @@ class TFC(nn.Module):
             self.loss_mode = args.loss_mode
             self.mse  = torch.nn.MSELoss()
             self.sdsc = SignalDiceLoss(alpha=args.alpha)
-            self.mae  = mae_loss()            
+            self.mae  = mae_loss()
             self.dtw = dtw_loss(approx=True,use_cuda=False)
+            self.zcr = DiffZCRLoss(alpha=10.0)  # AAAI27 Plan B++ AC-CL-2
 
             if self.loss_mode == "hybrid":
                 self.awl = AutomaticWeightedLoss(3)
@@ -266,6 +267,10 @@ class TFC(nn.Module):
                 loss = self.awl(loss_cl, (1-metric_pcc))
             elif self.loss_mode == 'snr':
                 loss = self.awl(loss_cl, -metric_si_snr)
+            elif self.loss_mode == 'zcr':
+                # AAAI27 Plan B++ AC-CL-2 — DiffZCRLoss baseline
+                loss_zcr = self.zcr(pred_x, x_in_t.reshape(x_in_t.size(0), -1).detach())
+                loss = self.awl(loss_cl, loss_zcr)
             else:
                 loss = self.awl(loss_cl, loss_rb, loss_sd)
                 # loss = (loss_cl + loss_rb*0.5 + loss_sd*0.5).mean()
