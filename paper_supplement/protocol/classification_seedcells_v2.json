@@ -1,0 +1,35 @@
+{
+  "schema_version": "2.0",
+  "purpose": "AAAI27 protocol v2 — TF-C + TS2Vec C-4/C-5 cross-backbone sweep. SimMTM-Cls is covered by existing v1 54-run sweep (loss-in-pretrain) and is NOT duplicated here.",
+  "frozen_at": "2026-06-19",
+  "freeze_tag": "sdsc-canonical-v6",
+  "canonical_commit": "9d09725",
+  "config": {
+    "backbones": ["TFC", "TS2Vec"],
+    "seeds": [42, 123, 2024],
+    "losses_c5": ["mse", "sdsc", "zcr"]
+  },
+  "dataset_types": [
+    {"id": "in_Epilepsy",            "source": "Epilepsy", "target": "Epilepsy", "kind": "in_domain"},
+    {"id": "in_Gesture",             "source": "Gesture",  "target": "Gesture",  "kind": "in_domain"},
+    {"id": "in_HAR",                 "source": "HAR",      "target": "HAR",      "kind": "in_domain"},
+    {"id": "xd_SleepEEG_Epilepsy",   "source": "SleepEEG", "target": "Epilepsy", "kind": "cross_domain"},
+    {"id": "xd_SleepEEG_Gesture",    "source": "SleepEEG", "target": "Gesture",  "kind": "cross_domain"},
+    {"id": "xd_ECG_Epilepsy",        "source": "ECG",      "target": "Epilepsy", "kind": "cross_domain"}
+  ],
+  "scope_summary": {
+    "encoder_pretrainings_per_backbone": 18,
+    "c5_head_runs_per_backbone": 54,
+    "c4_repr_runs_per_backbone": 18,
+    "total_compute_units": 144,
+    "estimated_gpu_hours": 8
+  },
+  "tripwires": {
+    "tfc_subset_trigger": {"epoch_time_min": 5, "subset_size": 50000, "applies_to": ["SleepEEG", "ECG"]},
+    "ts2vec_subset_trigger": {"epoch_time_min": 5, "subset_size": 50000, "applies_to": ["SleepEEG", "ECG"]}
+  },
+  "shared_with_v1": {
+    "simmtm_cls_results_dir": "SimMTM_Classification/outputs/classification_sweep/",
+    "note": "SimMTM-Cls covers the 'loss-in-pretrain' C-5 variant. TF-C and TS2Vec cover 'loss-in-recon-head' C-5 variant. Asymmetry is documented in protocol_v2.md Section AC-CL2-7 and will be reported honestly in paper Section 7."
+  }
+}
