@@ -862,3 +862,36 @@ Falsification gate 1 status: not triggered (catastrophic ZCR not observed — ZC
 Falsification gate 3 status: not triggered (in-domain 3-seed avg resolved 1.09% seed42 → 0.00%).
 
 If 3-seed avg confirms <0.5 cross-domain acc for GPT4TS on Epilepsy: report honestly. The thesis is *not* "all backbones generalize". The thesis is *SDSC measures structure, AC-6 TOST detects practical-equivalence to MSE on what acc-can-detect, and SDSC behaves loss-neutrally across decoupled head designs*. GPT4TS Epilepsy failure validates the framework rather than breaks it.
+
+## 18. Future work (limitations + post-AAAI27 roadmap)
+
+### 18.1 Backbone paradigm coverage — what's deferred
+
+This submission covers 4 classification SSL families: **masked-recon** (SimMTM-Cls), **contrastive freq-time** (TF-C), **hierarchical contrastive** (TS2Vec), and **LLM frozen** (GPT4TS). Three modern paradigms remain *explicitly deferred* and are not claimed:
+
+| Paradigm | Representative | Why deferred for AAAI27 |
+|---|---|---|
+| State-space (Mamba family) | S-Mamba (NeurIPS'24), TimeMachine (ICLR'25) | Public weights for classification track not released by upstream; `mamba-ssm` CUDA dependency adds reproducibility risk. Will integrate when official classification checkpoints are released. |
+| MLP-Mixer (latest) | TimeMixer (ICLR'24) | Conceptually close to DLinear which is already in forecasting track. Integration ETA: 1-2 weeks (post-camera-ready). |
+| Time-series foundation models | Moirai (ICML'24), Chronos (Amazon), TimesFM (Google ICML'24) | Pretrained on broad time-series corpora; classification track adaptation requires task-specific fine-tuning unsupported by upstream. Defer to a separate paper specifically on "SDSC under foundation-model probing". |
+
+### 18.2 Scope claim — what we DO claim with 4 backbones
+
+We claim **family-wide generalization across 4 SSL paradigms** of:
+- **Loss-neutrality** (decoupled-head pattern bitwise across paradigms)
+- **C-4 SDSC reconstruction differentiation** (encoder quality discrimination)
+- **Cross-domain TOST equivalence** (where applicable per Section 17.9)
+
+We do NOT claim:
+- "Best across all 2024-25 modern paradigms" (only 1 LLM paradigm GPT4TS NeurIPS'23)
+- "Validated on Mamba family" (deferred per 18.1)
+- "Validated on foundation models" (deferred per 18.1)
+
+### 18.3 Reviewer pre-emption — pre-registered honesty
+
+If a reviewer asks "why no S-Mamba/TimeMixer/Moirai?": refer to Section 18.1 + `paper_supplement/protocol/plan_v2_post_gpt4ts_decision.md` for the documented pre-mortem + decision-gate trail. This is not omission, it is *scoped*.
+
+### 18.4 Statistical scope limitations
+
+- 3-seed averaging: sufficient for AC-CL2-3 loss-neutrality at ≤2% threshold but not for narrow CI on individual cells. Future work: 5+ seeds for cells flagged in falsification gates.
+- TOST equivalence delta=2% is chosen ex-ante (matched to known classifier variance); sensitivity analysis at delta ∈ {1%, 1.5%, 3%} included in supplementary.
