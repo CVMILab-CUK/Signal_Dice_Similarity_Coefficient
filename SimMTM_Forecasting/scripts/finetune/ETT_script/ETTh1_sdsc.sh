@@ -1,10 +1,10 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0
 
 for points in 10 20 30 40 50; do
     python -u run.py \
         --task_name finetune \
         --is_training 1 \
-        --root_path /media/NAS/1_Datasets/EEG/EEG_benchmark/forecasting/dataset/ETT-small/ \
+        --root_path /workspace/data/signal/forecasting/ETT-small/ \
         --data_path ETTh1.csv \
         --model_id ETTh1 \
         --model SimMTM \
@@ -23,7 +23,6 @@ for points in 10 20 30 40 50; do
         --learning_rate 0.0001 \
         --dropout 0.2 \
         --batch_size 16 \
-        --use_multi_gpu \
         --loss_mode mse \
         --transfer_checkpoints ckpt$points.pth
 done

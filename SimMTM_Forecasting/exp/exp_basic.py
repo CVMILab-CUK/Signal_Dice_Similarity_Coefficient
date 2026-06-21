@@ -1,12 +1,17 @@
 import os
 import torch
-from models import SimMTM
+from models import SimMTM, PatchTST, iTransformer, DLinear
 
 
 class Exp_Basic(object):
     def __init__(self, args):
         self.args = args
-        self.model_dict = {'SimMTM': SimMTM}
+        self.model_dict = {
+            'SimMTM': SimMTM,
+            'PatchTST': PatchTST,
+            'iTransformer': iTransformer,
+            'DLinear': DLinear,
+        }
         self.device = self._acquire_device()
         self.model = self._build_model().to(self.device)
 

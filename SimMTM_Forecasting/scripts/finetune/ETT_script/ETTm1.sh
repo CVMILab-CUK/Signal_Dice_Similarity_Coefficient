@@ -1,10 +1,10 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0
 
 for loss_mode in softdtw freeze; do
     python -u run.py \
         --task_name finetune \
         --is_training 1 \
-        --root_path /media/NAS/1_Datasets/EEG/EEG_benchmark/forecasting/dataset/ETT-small/ \
+        --root_path /workspace/data/signal/forecasting/ETT-small/ \
         --data_path ETTm1.csv \
         --model_id ETTm1 \
         --model SimMTM \
@@ -21,6 +21,5 @@ for loss_mode in softdtw freeze; do
         --d_model 32 \
         --d_ff 64 \
         --dropout 0\
-        --use_multi_gpu \
         --loss_mode $loss_mode
 done

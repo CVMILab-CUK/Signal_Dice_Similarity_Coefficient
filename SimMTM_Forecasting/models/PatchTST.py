@@ -3,8 +3,10 @@ import torch.nn as nn
 from layers.Transformer_EncDec import Encoder, EncoderLayer
 from layers.SelfAttention_Family import DSAttention, AttentionLayer
 from layers.Embed import PatchEmbedding
-from utils.losses import AutomaticWeightedLoss
+from utils.losses import (AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss,
+                          ZCRLoss, DILATELoss)
 from utils.tools import ContrastiveWeight, AggregationRebuild
+from utils.metrics import SignalDice as SDSC, pearson_correlation, si_snr
 
 class Flatten_Head(nn.Module):
     def __init__(self, nf, pred_len, head_dropout=0):
@@ -50,8 +52,9 @@ class Model(nn.Module):
         self.output_attention = configs.output_attention
         self.configs = configs
 
-        # patching and embedding
-        self.patch_embedding = PatchEmbedding(configs.d_model, configs.patch_len, configs.stride, configs.stride, configs.dropout)
+        # patching and embedding (PatchEmbedding in this repo hard-codes padding=stride internally,
+        # so we don't pass a separate padding arg as in upstream Time-Series-Library).
+        self.patch_embedding = PatchEmbedding(configs.d_model, configs.patch_len, configs.stride, configs.dropout)
 
         # Encoder
         self.encoder = Encoder(
@@ -79,15 +82,28 @@ class Model(nn.Module):
             self.pooler = Pooler_Head(self.head_nf, head_dropout=configs.head_dropout)
 
             # for reconstruction
-            self.projection = Flatten_Head(self.head_nf, configs.d_model, configs.seq_len, head_dropout=configs.head_dropout)
+            self.projection = Flatten_Head(self.head_nf, configs.seq_len, head_dropout=configs.head_dropout)
 
-            self.awl = AutomaticWeightedLoss(2)
             self.contrastive = ContrastiveWeight(self.configs)
             self.aggregation = AggregationRebuild(self.configs)
-            self.mse = torch.nn.MSELoss()
+            self.mse  = torch.nn.MSELoss()
+            self.sdsc = SignalDiceLoss(alpha=getattr(configs, 'alpha', None))
+            self.mae  = mae_loss()
+            self.pcc  = pearson_correlation
+            self.si_snr = si_snr
+            self.dtw  = dtw_loss(approx=True, use_cuda=False)
+            self.zcr    = ZCRLoss(alpha=10.0)
+            self.dilate = DILATELoss(gamma_dilate=0.5, gamma_sdtw=0.01,
+                                     use_cuda=torch.cuda.is_available())
+
+            if getattr(configs, 'loss_mode', 'hybrid') == "hybrid":
+                self.awl = AutomaticWeightedLoss(3)
+            else:
+                self.awl = AutomaticWeightedLoss(2)
+            self.sdsc_metric = SDSC()
 
         elif self.task_name == 'finetune':
-            self.head = Flatten_Head(configs.head_nf, configs.d_model, configs.pred_len, head_dropout=configs.head_dropout)
+            self.head = Flatten_Head(self.head_nf, configs.pred_len, head_dropout=configs.head_dropout)
 
     def forecast(self, x_enc, x_mark_enc):
 
@@ -107,7 +123,11 @@ class Model(nn.Module):
         # encoder
         enc_out, _ = self.encoder(enc_out) # enc_out: [(bs * n_vars) x patch_num x d_model]
 
-        enc_out = torch.reshape(enc_out, (bs, n_vars, seq_len, -1)) # enc_out: [bs x n_vars x patch_num x d_model]
+        # BUGFIX: original used seq_len here which only worked when patch_num*d_model is
+        # divisible by seq_len (e.g. ETTh1/ETTm1 with d_model=32). For d_model=8 datasets
+        # (ETTh2/ETTm2) this raised "invalid for input of size N". Use shape inference
+        # so it works for any (patch_num, d_model) combination.
+        enc_out = torch.reshape(enc_out, (bs, n_vars, -1, enc_out.shape[-1])) # [bs x n_vars x patch_num x d_model]
 
         # decoder
         dec_out = self.head(enc_out)  # dec_out: [bs x n_vars x pred_len]
@@ -159,13 +179,46 @@ class Model(nn.Module):
 
         pred_batch_x = dec_out[:batch_x.shape[0]]
 
-        # series reconstruction
-        loss_rb = self.mse(pred_batch_x, batch_x.detach())
+        metric_sd     = self.sdsc_metric(pred_batch_x, batch_x.detach())
+        metric_pcc    = self.pcc(pred_batch_x, batch_x.detach())
+        metric_si_snr = self.si_snr(pred_batch_x, batch_x.detach())
 
-        # loss
-        loss = self.awl(loss_cl, loss_rb)
+        device = pred_batch_x.device
+        zero = torch.tensor(0., device=device)
+        loss_rb = loss_sd = loss_mae = loss_dtw = loss_zcr = loss_dilate = zero
 
-        return loss, loss_cl, loss_rb, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
+        lm = self.configs.loss_mode
+        if lm == "mse":
+            loss_rb = self.mse(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_rb)
+        elif lm == "sdsc":
+            loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_sd)
+        elif lm == "mae":
+            loss_mae = self.mae(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_mae)
+        elif lm == "dtw":
+            loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_dtw)
+        elif lm == "pcc":
+            loss = self.awl(loss_cl, (1 - metric_pcc))
+        elif lm == "snr":
+            loss = self.awl(loss_cl, (-metric_si_snr))
+        elif lm == "zcr":
+            loss_zcr = self.zcr(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_zcr)
+        elif lm == "dilate":
+            loss_dilate = self.dilate(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_dilate)
+        else:  # hybrid
+            loss_rb = self.mse(pred_batch_x, batch_x.detach())
+            loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_rb, loss_sd)
+
+        return (loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw,
+                loss_zcr, loss_dilate,
+                metric_sd, metric_pcc, metric_si_snr,
+                positives_mask, logits, rebuild_weight_matrix, pred_batch_x)
 
     def forward(self, x_enc, x_mark_enc, batch_x=None, mask=None):
 

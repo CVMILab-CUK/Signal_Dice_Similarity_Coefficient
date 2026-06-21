@@ -1,8 +1,8 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0
 
 python -u run.py \
     --task_name pretrain \
-    --root_path /media/NAS/1_Datasets/EEG/EEG_benchmark/forecasting/dataset/electricity/ \
+    --root_path /workspace/data/signal/forecasting/electricity/ \
     --data_path electricity.csv \
     --model_id ECL \
     --model SimMTM \
@@ -22,4 +22,3 @@ python -u run.py \
     --batch_size 16 \
     --train_epochs 50 \
     --temperature 0.02 \
-    --use_multi_gpu

@@ -124,6 +124,32 @@ class DataEmbedding(nn.Module):
         return self.dropout(x)
 
 
+class DataEmbedding_inverted(nn.Module):
+    """Inverted data embedding from Liu et al. (ICLR 2024), iTransformer.
+
+    Maps the input ``x`` of shape [Batch, Time, Variate] to [Batch, Variate, d_model]
+    by treating each variate's full time series as a token, then linearly projecting
+    that time series (length ``c_in`` = seq_len) into ``d_model`` dimensions. This
+    inversion is the key difference from the original Transformer embedding.
+    """
+
+    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+        super(DataEmbedding_inverted, self).__init__()
+        # c_in is seq_len here (each variate is treated as a token).
+        self.value_embedding = nn.Linear(c_in, d_model)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x, x_mark=None):
+        # x: [Batch, Time, Variate] -> [Batch, Variate, Time]
+        x = x.permute(0, 2, 1)
+        if x_mark is None:
+            x = self.value_embedding(x)
+        else:
+            # Concatenate variate-time and time-mark dims so embedding sees both.
+            x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1))
+        return self.dropout(x)  # [Batch, Variate(+marks), d_model]
+
+
 class DataEmbedding_wo_pos(nn.Module):
     def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
         super(DataEmbedding_wo_pos, self).__init__()

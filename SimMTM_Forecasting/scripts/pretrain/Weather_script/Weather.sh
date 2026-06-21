@@ -1,8 +1,8 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0
 
 python -u run.py \
     --task_name pretrain \
-    --root_path /media/NAS/1_Datasets/EEG/EEG_benchmark/forecasting/dataset/weather/ \
+    --root_path /workspace/data/signal/forecasting/weather/ \
     --data_path weather.csv \
     --model_id Weather \
     --model SimMTM \
@@ -21,7 +21,6 @@ python -u run.py \
     --learning_rate 0.001 \
     --batch_size 32 \
     --train_epochs 50\
-    --use_multi_gpu\
     --use_amp
 
 

@@ -1,15 +1,25 @@
 import argparse
+import os
+# Redirect Python/PyTorch shared-memory temp files from the 64MB /dev/shm to
+# /workspace (3.6T). DataLoader multiprocessing puts tensor "shared storage"
+# into one of these locations; the 64MB /dev/shm runs out instantly for
+# ECL/Traffic-scale tensors. Setting TMPDIR before importing torch + switching
+# multiprocessing to the 'file_system' sharing strategy lets us keep
+# num_workers > 0 (5x faster than num_workers=0) without OOMing on shm.
+os.environ.setdefault("TMPDIR", "/workspace/tmp")
+os.makedirs(os.environ["TMPDIR"], exist_ok=True)
+
 import torch
+import torch.multiprocessing as _mp
+try:
+    _mp.set_sharing_strategy("file_system")
+except RuntimeError:
+    pass
+
 from exp.exp_simmtm import Exp_SimMTM
 import random
 import numpy as np
-import os
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-
-fix_seed = 2023
-random.seed(fix_seed)
-torch.manual_seed(fix_seed)
-np.random.seed(fix_seed)
 
 parser = argparse.ArgumentParser(description='SimMTM')
 
@@ -93,7 +103,20 @@ parser.add_argument('--mask_rate', type=float, default=0.5, help='mask ratio')
 parser.add_argument('--loss_mode', type=str, default='hybrid', help='pretrain loss mode. ["mse", "sdsc", "hybird"]')
 parser.add_argument('--alpha', type=int, default=None, help='Approx parameters')
 
+# Reproducibility
+parser.add_argument('--seed', type=int, default=2023, help='random seed for reproducibility (used across python random, numpy, torch CPU, torch CUDA)')
+
 args = parser.parse_args()
+
+# Set all RNG seeds and force deterministic kernels (US-001 / F7)
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(args.seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 
 if args.use_gpu and args.use_multi_gpu:
@@ -105,7 +128,7 @@ print('Args in experiment:')
 print(args)
 
 # Check Loss mode
-assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw', 'con', 'pcc', 'snr', 'freeze','softdtw', '1', '10','100'], f"Check your Loss mode we only support 'mse','sdsc','hybird' 'mae' and 'dtw', now : {args.loss_mode}"
+assert args.loss_mode in ['mse', 'sdsc', 'hybrid', 'mae', 'dtw', 'con', 'pcc', 'snr', 'freeze', 'softdtw', 'zcr', 'dilate', '1', '10', '100'], f"Check your Loss mode: got {args.loss_mode}"
 
 Exp = Exp_SimMTM
 if args.task_name == 'pretrain':

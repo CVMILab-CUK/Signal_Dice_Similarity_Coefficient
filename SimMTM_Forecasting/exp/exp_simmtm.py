@@ -2,7 +2,8 @@ from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from utils.tools import EarlyStopping, adjust_learning_rate, transfer_weights, show_series, show_matrix
 from utils.augmentations import masked_data
-from utils.metrics import metric
+from utils.metrics import metric, SignalDice as _SignalDiceMetric
+from utils.losses import dtw_loss as _DTWLossEval, DILATELoss as _DILATELossEval
 from torch.optim import lr_scheduler
 import torch
 import torch.nn as nn
@@ -20,8 +21,19 @@ warnings.filterwarnings('ignore')
 class Exp_SimMTM(Exp_Basic):
     def __init__(self, args):
         super(Exp_SimMTM, self).__init__(args)
-        self.writer = SummaryWriter(f"./outputs/logs/{args.data}/{args.alpha}")
+        # US-005 / A1-NEW-2: include loss_mode, alpha tag, and seed in TensorBoard path
+        # so 25 runs from the 5-loss x 5-seed sweep do not collide in the same directory.
+        alpha_tag = str(args.alpha) if getattr(args, 'alpha', None) is not None else "default"
+        seed_tag = getattr(args, 'seed', 'unspecified')
+        self.writer = SummaryWriter(
+            f"./outputs/logs/{args.data}/{args.loss_mode}/alpha-{alpha_tag}/seed-{seed_tag}"
+        )
         self.patience = 5
+        # AMP scaler. Enabled only when --use_amp is set; otherwise no-op (FP32 path).
+        # Crucial for ECL/Traffic memory: attention scores in FP16 are half-size, which
+        # turned a 48GB OOM on Traffic batch=2 into comfortable headroom.
+        self.use_amp = bool(getattr(args, 'use_amp', False)) and torch.cuda.is_available()
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
 
 
 
@@ -64,7 +76,13 @@ class Exp_SimMTM(Exp_Basic):
         # show cases
         self.train_show = next(iter(train_loader))
         self.valid_show = next(iter(vali_loader))
-        path = os.path.join(self.args.pretrain_checkpoints, self.args.data, str(self.args.alpha)) if self.args.alpha else os.path.join(self.args.pretrain_checkpoints, self.args.data)
+        # US-005 Task 5b / C2: when alpha is None (default), nest checkpoint by loss_mode
+        # so the finetune load path os.path.join(..., args.data, args.loss_mode, ...) at
+        # run.py:170 actually finds the saved ckpt_best.pth.
+        if self.args.alpha is not None:
+            path = os.path.join(self.args.pretrain_checkpoints, self.args.data, str(self.args.alpha))
+        else:
+            path = os.path.join(self.args.pretrain_checkpoints, self.args.data, self.args.loss_mode)
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -79,37 +97,56 @@ class Exp_SimMTM(Exp_Basic):
         for epoch in range(self.args.train_epochs):
             start_time = time.time()
 
-            train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric, train_pcc_metric, train_si_snr_metric = self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
-            valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric, valid_pcc_metric, valid_si_snr_metric = self.valid_one_epoch(vali_loader, corr=True)
+            (train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss,
+             train_mae_loss, train_dtw_loss, train_zcr_loss, train_dilate_loss,
+             train_sdsc_metric, train_pcc_metric, train_si_snr_metric) = self.pretrain_one_epoch(train_loader, model_optim, model_scheduler)
+            (valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss,
+             valid_mae_loss, valid_dtw_loss, valid_zcr_loss, valid_dilate_loss,
+             valid_sdsc_metric, valid_pcc_metric, valid_si_snr_metric) = self.valid_one_epoch(vali_loader, corr=True)
 
-            # log and Loss
+            # log and Loss (zcr/dilate appended after dtw)
             end_time = time.time()
             print(
-                "Epoch: {0}, Lr: {1:.7f}, Time: {2:.2f}s | Train Loss: {3:.4f}/{4:.4f}/{5:.4f}/{6:.4f}/{7:.4f}/{8:.4f} Val Loss: {9:.4f}/{10:.4f}/{11:.4f}/{12:.4f}/{13:.4f}/{14:.4f} | Metric: {15:.4f}/{16:.4f}/{17:.4f} |{18:.4f}/{19:.4f}/{20:.4f}"
-                .format(epoch, model_scheduler.get_lr()[0], end_time - start_time, train_loss, train_cl_loss,
-                        train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss,
-                        valid_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss,
-                        train_sdsc_metric, train_pcc_metric, train_si_snr_metric, valid_sdsc_metric,valid_pcc_metric,valid_si_snr_metric))
+                "Epoch: {epoch}, Lr: {lr:.7f}, Time: {dt:.2f}s | "
+                "Train cl/rb/sd/mae/dtw/zcr/dilate: "
+                "{tcl:.4f}/{trb:.4f}/{tsd:.4f}/{tmae:.4f}/{tdtw:.4f}/{tzcr:.4f}/{tdil:.4f} | "
+                "Val cl/rb/sd/mae/dtw/zcr/dilate: "
+                "{vcl:.4f}/{vrb:.4f}/{vsd:.4f}/{vmae:.4f}/{vdtw:.4f}/{vzcr:.4f}/{vdil:.4f} | "
+                "Metric tr SDSC/PCC/SI-SNR: {tsdm:.4f}/{tpccm:.4f}/{tsnrm:.4f} "
+                "val SDSC/PCC/SI-SNR: {vsdm:.4f}/{vpccm:.4f}/{vsnrm:.4f}".format(
+                    epoch=epoch, lr=model_scheduler.get_lr()[0], dt=end_time - start_time,
+                    tcl=train_cl_loss, trb=train_rb_loss, tsd=train_sdsc_loss,
+                    tmae=train_mae_loss, tdtw=train_dtw_loss, tzcr=train_zcr_loss, tdil=train_dilate_loss,
+                    vcl=valid_cl_loss, vrb=valid_rb_loss, vsd=valid_sdsc_loss,
+                    vmae=valid_mae_loss, vdtw=valid_dtw_loss, vzcr=valid_zcr_loss, vdil=valid_dilate_loss,
+                    tsdm=train_sdsc_metric, tpccm=train_pcc_metric, tsnrm=train_si_snr_metric,
+                    vsdm=valid_sdsc_metric, vpccm=valid_pcc_metric, vsnrm=valid_si_snr_metric,
+                )
+            )
 
             loss_scalar_dict = {
                 'train_loss': train_loss,
                 'train_cl_loss': train_cl_loss,
                 'train_rb_loss': train_rb_loss,
-                'train_sdsc_loss':train_sdsc_loss,
+                'train_sdsc_loss': train_sdsc_loss,
                 'train_mae_loss': train_mae_loss,
                 'train_dtw_loss': train_dtw_loss,
-                'train_sdsc':train_sdsc_metric,
-                'train_pcc_metric':train_pcc_metric,
-                'train_si_snr_metric':train_si_snr_metric,
+                'train_zcr_loss': train_zcr_loss,
+                'train_dilate_loss': train_dilate_loss,
+                'train_sdsc': train_sdsc_metric,
+                'train_pcc_metric': train_pcc_metric,
+                'train_si_snr_metric': train_si_snr_metric,
                 'vali_loss': valid_loss,
                 'valid_cl_loss': valid_cl_loss,
                 'valid_rb_loss': valid_rb_loss,
                 'valid_sdsc_loss': valid_sdsc_loss,
                 'valid_mae_loss': valid_mae_loss,
-                'valid_dtw_loss':valid_dtw_loss,
+                'valid_dtw_loss': valid_dtw_loss,
+                'valid_zcr_loss': valid_zcr_loss,
+                'valid_dilate_loss': valid_dilate_loss,
                 'valid_sdsc': valid_sdsc_metric,
-                'valid_pcc_metric':valid_pcc_metric,
-                'valid_si_snr_metric':valid_si_snr_metric
+                'valid_pcc_metric': valid_pcc_metric,
+                'valid_si_snr_metric': valid_si_snr_metric,
             }
 
             self.writer.add_scalars(f"pretrain_loss", loss_scalar_dict, epoch)
@@ -164,6 +201,8 @@ class Exp_SimMTM(Exp_Basic):
         train_sdsc_loss = []
         train_mae_loss  = []
         train_dtw_loss  = []
+        train_zcr_loss = []
+        train_dilate_loss = []
         train_sdsc_metric =[]
         train_pcc_metric = []
         train_si_snr_metric = []
@@ -200,23 +239,31 @@ class Exp_SimMTM(Exp_Basic):
             batch_x_om = batch_x_om.float().to(self.device)
             batch_x_mark = batch_x_mark.float().to(self.device)
 
-            # encoder
-            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr,_, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            # encoder (15 values: ..., loss_zcr, loss_dilate, metrics, masks/logits/...)
+            # AMP autocast wraps the model forward + loss compute.
+            with torch.cuda.amp.autocast(enabled=self.use_amp):
+                (loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw,
+                 loss_zcr, loss_dilate,
+                 metric_sd, metric_pcc, metric_si_snr,
+                 _, _, _, _) = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
-            # Gathering
-            loss      = loss.mean()
-            loss_cl   = loss_cl.mean()
-            loss_rb   = loss_rb.mean()
-            loss_sd   = loss_sd.mean()
-            loss_mae  = loss_mae.mean()
-            loss_dtw  = loss_dtw.mean()
-            metric_sd = metric_sd.mean()
-            metric_pcc = metric_pcc.mean()
-            metric_si_snr = metric_si_snr.mean()
+                # Gathering (still inside autocast; cheap)
+                loss      = loss.mean()
+                loss_cl   = loss_cl.mean()
+                loss_rb   = loss_rb.mean()
+                loss_sd   = loss_sd.mean()
+                loss_mae  = loss_mae.mean()
+                loss_dtw  = loss_dtw.mean()
+                loss_zcr  = loss_zcr.mean()
+                loss_dilate = loss_dilate.mean()
+                metric_sd = metric_sd.mean()
+                metric_pcc = metric_pcc.mean()
+                metric_si_snr = metric_si_snr.mean()
 
-            # backward
-            loss.backward()
-            model_optim.step()
+            # backward (GradScaler is a no-op when use_amp=False)
+            self.scaler.scale(loss).backward()
+            self.scaler.step(model_optim)
+            self.scaler.update()
 
             # record
             train_loss.append(loss.item())
@@ -225,6 +272,8 @@ class Exp_SimMTM(Exp_Basic):
             train_sdsc_loss.append(loss_sd.item())
             train_mae_loss.append(loss_mae.item())
             train_dtw_loss.append(loss_dtw.item())
+            train_zcr_loss.append(loss_zcr.item())
+            train_dilate_loss.append(loss_dilate.item())
             train_sdsc_metric.append(metric_sd.item())
             train_pcc_metric.append(metric_pcc.item())
             train_si_snr_metric.append(metric_si_snr.item())
@@ -237,11 +286,15 @@ class Exp_SimMTM(Exp_Basic):
         train_sdsc_loss   = np.average(train_sdsc_loss)
         train_mae_loss    = np.average(train_mae_loss)
         train_dtw_loss    = np.average(train_dtw_loss)
+        train_zcr_loss    = np.average(train_zcr_loss)
+        train_dilate_loss = np.average(train_dilate_loss)
         train_sdsc_metric = np.average(train_sdsc_metric)
         train_pcc_metric  = np.average(train_pcc_metric)
         train_si_snr_metric = np.average(train_si_snr_metric)
 
-        return train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss, train_mae_loss, train_dtw_loss, train_sdsc_metric, train_pcc_metric, train_si_snr_metric
+        return (train_loss, train_cl_loss, train_rb_loss, train_sdsc_loss,
+                train_mae_loss, train_dtw_loss, train_zcr_loss, train_dilate_loss,
+                train_sdsc_metric, train_pcc_metric, train_si_snr_metric)
 
     def valid_one_epoch(self, vali_loader, corr=False):
         valid_loss = []
@@ -250,6 +303,8 @@ class Exp_SimMTM(Exp_Basic):
         valid_sdsc_loss = []
         valid_mae_loss  = []
         valid_dtw_loss  = []
+        valid_zcr_loss = []
+        valid_dilate_loss = []
         valid_sdsc_metric = []
         valid_pcc_metric = []
         valid_si_snr_metric = []
@@ -271,9 +326,12 @@ class Exp_SimMTM(Exp_Basic):
             batch_x_om = batch_x_om.float().to(self.device)
             batch_x_mark = batch_x_mark.float().to(self.device)
 
-            # encoder
-            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr,_, _, _, _ = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
-            
+            # encoder (15 values)
+            (loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw,
+             loss_zcr, loss_dilate,
+             metric_sd, metric_pcc, metric_si_snr,
+             _, _, _, _) = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+
             # Gathering
             loss      = loss.mean()
             loss_cl   = loss_cl.mean()
@@ -281,11 +339,13 @@ class Exp_SimMTM(Exp_Basic):
             loss_sd   = loss_sd.mean()
             loss_mae  = loss_mae.mean()
             loss_dtw  = loss_dtw.mean()
+            loss_zcr  = loss_zcr.mean()
+            loss_dilate = loss_dilate.mean()
             metric_sd = metric_sd.mean()
             metric_pcc = metric_pcc.mean()
             metric_si_snr = metric_si_snr.mean()
 
-            
+
             # Record
             valid_loss.append(loss.item())
             valid_cl_loss.append(loss_cl.item())
@@ -293,6 +353,8 @@ class Exp_SimMTM(Exp_Basic):
             valid_sdsc_loss.append(loss_sd.item())
             valid_mae_loss.append(loss_mae.item())
             valid_dtw_loss.append(loss_dtw.item())
+            valid_zcr_loss.append(loss_zcr.item())
+            valid_dilate_loss.append(loss_dilate.item())
             valid_sdsc_metric.append(metric_sd.item())
             valid_pcc_metric.append(metric_pcc.item())
             valid_si_snr_metric.append(metric_si_snr.item())
@@ -308,11 +370,15 @@ class Exp_SimMTM(Exp_Basic):
         valid_sdsc_loss   = np.average(valid_sdsc_loss)
         valid_mae_loss    = np.average(valid_mae_loss)
         valid_dtw_loss    = np.average(valid_dtw_loss)
+        valid_zcr_loss    = np.average(valid_zcr_loss)
+        valid_dilate_loss = np.average(valid_dilate_loss)
         valid_sdsc_metric = np.average(valid_sdsc_metric)
         valid_pcc_metric  = np.average(valid_pcc_metric)
         valid_si_snr_metric = np.average(valid_si_snr_metric)
         self.model.train()
-        return vali_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss, valid_mae_loss, valid_dtw_loss, valid_sdsc_metric, valid_pcc_metric, valid_si_snr_metric
+        return (vali_loss, valid_cl_loss, valid_rb_loss, valid_sdsc_loss,
+                valid_mae_loss, valid_dtw_loss, valid_zcr_loss, valid_dilate_loss,
+                valid_sdsc_metric, valid_pcc_metric, valid_si_snr_metric)
 
     def train(self, setting):
 
@@ -363,18 +429,20 @@ class Exp_SimMTM(Exp_Basic):
                 batch_y = batch_y.float().to(self.device)
                 batch_x_mark = batch_x_mark.float().to(self.device)
 
-                # encoder
-                outputs = self.model(batch_x, batch_x_mark)
+                # encoder (under AMP autocast so finetune also runs FP16 when --use_amp)
+                with torch.cuda.amp.autocast(enabled=self.use_amp):
+                    outputs = self.model(batch_x, batch_x_mark)
 
-                f_dim = -1 if self.args.features == 'MS' else 0
+                    f_dim = -1 if self.args.features == 'MS' else 0
 
-                outputs = outputs[:, -self.args.pred_len:, f_dim:]
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                    outputs = outputs[:, -self.args.pred_len:, f_dim:]
+                    batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
 
-                # loss
-                loss = criterion(outputs, batch_y)
-                loss.backward()
-                model_optim.step()
+                    loss = criterion(outputs, batch_y)
+
+                self.scaler.scale(loss).backward()
+                self.scaler.step(model_optim)
+                self.scaler.update()
 
                 # record
                 train_loss.append(loss.item())
@@ -463,10 +531,51 @@ class Exp_SimMTM(Exp_Basic):
         trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
-        print('{0}->{1}, mse:{2:.3f}, mae:{3:.3f}'.format(self.args.seq_len, self.args.pred_len, mse, mae))
-        f = open(f"./outputs/{loss_mode}_score.txt", 'a')
-        f.write('{0}->{1}, {2:.3f}, {3:.3f} \n'.format(self.args.seq_len, self.args.pred_len, mse, mae))
-        f.close()
+
+        # Structural metrics on test forecasts.
+        # SDSC: linear-time, evaluate once on the full tensor.
+        sdsc_eval = _SignalDiceMetric()
+        preds_t = torch.from_numpy(preds).float()
+        trues_t = torch.from_numpy(trues).float()
+        sdsc = float(sdsc_eval(preds_t, trues_t).item())
+
+        # SoftDTW and DILATE: O(T^2) per sample. Run in chunks to keep memory bounded.
+        # We compute on a fixed eval subset if test set is huge to keep wall-clock predictable.
+        device = self.device if torch.cuda.is_available() else torch.device('cpu')
+        EVAL_CHUNK = 64                                                # batches of 64 samples
+        MAX_EVAL_SAMPLES = min(preds.shape[0], 1024)                  # cap at 1024 to keep test < 1 min
+        eval_preds = preds_t[:MAX_EVAL_SAMPLES].to(device)
+        eval_trues = trues_t[:MAX_EVAL_SAMPLES].to(device)
+
+        softdtw_fn = _DTWLossEval(approx=True, use_cuda=torch.cuda.is_available())
+        dilate_fn = _DILATELossEval(gamma_dilate=0.5, gamma_sdtw=0.01,
+                                    use_cuda=torch.cuda.is_available())
+
+        sdtw_vals, dilate_vals = [], []
+        with torch.no_grad():
+            for start in range(0, MAX_EVAL_SAMPLES, EVAL_CHUNK):
+                end = min(start + EVAL_CHUNK, MAX_EVAL_SAMPLES)
+                p_chunk = eval_preds[start:end]
+                t_chunk = eval_trues[start:end]
+                # dtw_loss.forward defaults to divergence form; pass div=False to get raw SoftDTW.
+                sdtw_v = softdtw_fn(p_chunk, t_chunk, div=False).item()
+                dlt_v  = dilate_fn(p_chunk, t_chunk).item()
+                sdtw_vals.append((end - start) * sdtw_v)
+                dilate_vals.append((end - start) * dlt_v)
+        softdtw_v = sum(sdtw_vals) / MAX_EVAL_SAMPLES
+        dilate_v  = sum(dilate_vals) / MAX_EVAL_SAMPLES
+
+        print('{0}->{1}, mse:{2:.4f}, mae:{3:.4f}, sdsc:{4:.4f}, softdtw:{5:.4f}, dilate:{6:.4f}'.format(
+            self.args.seq_len, self.args.pred_len, mse, mae, sdsc, softdtw_v, dilate_v))
+        # 6-col format: "{seq}->{pred}, mse, mae, sdsc, softdtw, dilate".
+        # analyze_multi_v2.py tolerates 3/4/6-col lines.
+        out_line = '{0}->{1}, {2:.4f}, {3:.4f}, {4:.4f}, {5:.4f}, {6:.4f}\n'.format(
+            self.args.seq_len, self.args.pred_len, mse, mae, sdsc, softdtw_v, dilate_v)
+        with open(f"./outputs/{loss_mode}_score.txt", 'a') as f:
+            f.write(out_line)
+        os.makedirs(folder_path, exist_ok=True)
+        with open(os.path.join(folder_path, f"{loss_mode}_score.txt"), 'a') as f:
+            f.write(out_line)
 
     def show(self, num, epoch, type='valid'):
 
@@ -491,9 +600,12 @@ class Exp_SimMTM(Exp_Basic):
         batch_x_om = batch_x_om.float().to(self.device)
         batch_x_mark = batch_x_mark.float().to(self.device)
 
-        # Encoder
+        # Encoder (15 values incl. loss_zcr, loss_dilate)
         with torch.no_grad():
-            loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc, metric_si_snr,positives_mask, logits, rebuild_weight_matrix, pred_batch_x = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
+            (loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw,
+             loss_zcr, loss_dilate,
+             metric_sd, metric_pcc, metric_si_snr,
+             positives_mask, logits, rebuild_weight_matrix, pred_batch_x) = self.model(batch_x_om, batch_x_mark, batch_x, mask=mask_om)
 
         for i in range(num):
 

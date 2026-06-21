@@ -4,4 +4,12 @@ __pycache__
 # These directories are themselves git repos; do not track inside parent repo.
 backbones/
 # auto-generated sweep flags
+paper_supplement/*
 paper_supplement/scripts/v*_triggered.flag
+protocols
+.omc
+outputs
+.vscode
+scripts/experiments/*
+
+*.npz

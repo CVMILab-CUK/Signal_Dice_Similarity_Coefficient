@@ -3,7 +3,7 @@ import torch.nn as nn
 from layers.Transformer_EncDec import Decoder, DecoderLayer, Encoder, EncoderLayer
 from layers.SelfAttention_Family import DSAttention, AttentionLayer
 from layers.Embed import DataEmbedding
-from utils.losses import AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss, DTWLoss
+from utils.losses import AutomaticWeightedLoss, SignalDiceLoss, mae_loss, dtw_loss, DTWLoss, ZCRLoss, DILATELoss
 from utils.tools import ContrastiveWeight, AggregationRebuild
 from utils.metrics import SignalDice as SDSC, pearson_correlation, si_snr
 
@@ -89,7 +89,12 @@ class Model(nn.Module):
             self.si_snr = si_snr
             self.dtw = dtw_loss(approx=True, use_cuda=False)
             # self.dtw = DTWLoss()
-            
+
+            # US-004: new baselines for AAAI27 SDSC paper
+            self.zcr = ZCRLoss(alpha=10.0)                                    # sign-only ablation
+            self.dilate = DILATELoss(gamma_dilate=0.5, gamma_sdtw=0.01,
+                                     use_cuda=torch.cuda.is_available())     # shape+temporal
+
             if self.configs.loss_mode == "hybrid":
                 self.awl = AutomaticWeightedLoss(3)
             else:
@@ -220,41 +225,53 @@ class Model(nn.Module):
 
         pred_batch_x = dec_out[:batch_x.shape[0]]
 
-        # series reconstruction
-        loss_rb = self.mse(pred_batch_x, batch_x.detach())
-        loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
-        loss_mae = self.mae(pred_batch_x, batch_x.detach())
-        loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
-        # print("loss")
-        # loss_dtw = torch.tensor([0.]).to(0)
-
-
-        # metrics 
+        # Cheap metrics (always computed for pretrain monitoring)
         metric_sd = self.sdsc_metric(pred_batch_x, batch_x.detach())
         metric_pcc = self.pcc(pred_batch_x, batch_x.detach())
         metric_si_snr = self.si_snr(pred_batch_x, batch_x.detach())
 
+        # Only compute the reconstruction loss required by the active loss_mode.
+        # Inactive losses stay at 0 — avoids wasting compute on SoftDTW (CPU O(T^2))
+        # and DILATE (numba O(T^2)) every batch.
+        device = pred_batch_x.device
+        zero = torch.tensor(0., device=device)
+        loss_rb = loss_sd = loss_mae = loss_dtw = loss_zcr = loss_dilate = zero
 
-        if self.configs.loss_mode == "mse":
+        lm = self.configs.loss_mode
+        if lm == "mse":
+            loss_rb = self.mse(pred_batch_x, batch_x.detach())
             loss = self.awl(loss_cl, loss_rb)
-        elif self.configs.loss_mode =="sdsc":
+        elif lm == "sdsc":
+            loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
             loss = self.awl(loss_cl, loss_sd)
-        elif self.configs.loss_mode =="mae":
+        elif lm == "mae":
+            loss_mae = self.mae(pred_batch_x, batch_x.detach())
             loss = self.awl(loss_cl, loss_mae)
-        elif self.configs.loss_mode == "dtw":
-            loss = self.awl(loss_dtw)
-        elif self.configs.loss_mode == "con":
+        elif lm == "dtw":
+            loss_dtw = self.dtw(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_dtw)
+        elif lm == "con":
             loss = loss_cl
-        elif self.configs.loss_mode == "pcc":
+        elif lm == "pcc":
             loss = self.awl(loss_cl, (1 - metric_pcc))
-        elif self.configs.loss_mode == "snr":
+        elif lm == "snr":
             loss = self.awl(loss_cl, (-metric_si_snr))
-        else:
+        elif lm == "zcr":
+            loss_zcr = self.zcr(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_zcr)
+        elif lm == "dilate":
+            loss_dilate = self.dilate(pred_batch_x, batch_x.detach())
+            loss = self.awl(loss_cl, loss_dilate)
+        else:  # hybrid
+            loss_rb = self.mse(pred_batch_x, batch_x.detach())
+            loss_sd = self.sdsc(pred_batch_x, batch_x.detach())
             loss = self.awl(loss_cl, loss_rb, loss_sd)
-            # loss = loss_cl + 0.5*loss_rb + 0.5*loss_sd
-        
 
-        return loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw, metric_sd, metric_pcc,  metric_si_snr, positives_mask, logits, rebuild_weight_matrix, pred_batch_x
+
+        return (loss, loss_cl, loss_rb, loss_sd, loss_mae, loss_dtw,
+                loss_zcr, loss_dilate,
+                metric_sd, metric_pcc, metric_si_snr,
+                positives_mask, logits, rebuild_weight_matrix, pred_batch_x)
     
     
     def forward(self, x_enc, x_mark_enc, batch_x=None, mask=None):
