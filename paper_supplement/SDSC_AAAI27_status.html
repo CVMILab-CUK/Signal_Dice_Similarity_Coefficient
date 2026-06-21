@@ -41,8 +41,9 @@
 
 <h1>SDSC AAAI27 — 현재 상태 (2026-06-21)</h1>
 <div class="meta">
-  Tag: <code>sdsc-canonical-v8</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
-  Prior rejections: AAAI26, ICLR26, ICML26 — 모두 reject
+  Tag: <code>sdsc-canonical-v9</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
+  Prior rejections: AAAI26, ICLR26, ICML26 — 모두 reject<br>
+  <span class="tag good">Day 1 Plan G' 진행 중</span> GPT4TS (NeurIPS'23 LLM paradigm) sweep 39/90 cells DONE, FAIL=0 — 4번째 classification backbone 통합 중. Tag <code>v10</code> 예정.
 </div>
 
 <div class="oneliner">
@@ -50,7 +51,7 @@
 </div>
 
 <!-- ============================================================ -->
-<h2>1. Backbone coverage — 현재 7개 (4 forecasting + 3 classification)</h2>
+<h2>1. Backbone coverage — 8개 (4 forecasting + 4 classification, GPT4TS LLM 추가 진행 중)</h2>
 
 <table>
 <thead>
@@ -71,7 +72,7 @@
 
 <div class="highlight">
 <strong>⚠️ 한계 1 — Year 분포</strong>: classification 모든 backbone이 2022-23년. <strong>2024-25 최신 모델 없음</strong>. ICLR/ICML reviewer가 "outdated benchmark" 비판 가능.<br>
-<strong>⚠️ 한계 2 — Architecture diversity</strong>: classification은 contrastive-only 3개. Mamba (SSM), LLM-based, Foundation Model 같은 신규 패러다임 부재.
+<strong>⚠️ 한계 2 — Architecture diversity (부분 해소)</strong>: 원래 contrastive-only 3개였으나, Plan G' R1 fallback으로 <strong>GPT4TS (NeurIPS'23 LLM paradigm)</strong> 4번째 classification backbone 통합 중. S-Mamba (NeurIPS'24)는 시도했으나 차단 (no public ckpt + mamba-ssm CUDA dep). Mamba/Foundation Model은 future work으로 명시 예정 (Section 18).
 </div>
 
 <!-- ============================================================ -->
@@ -261,7 +262,7 @@ d2df843  V1 Tier A — AC-7 PASS                                             ←
 
 <hr style="margin: 3rem 0 1rem; border: none; border-top: 1px solid var(--border);">
 <div class="meta" style="text-align: center;">
-  Generated 2026-06-21 · tag sdsc-canonical-v8 · ralplan consensus for modern-backbone addition pending
+  Generated 2026-06-21 · tag sdsc-canonical-v9 · Plan G' Day 1 in progress (GPT4TS sweep) · Plan v2 decision gate documented
 </div>
 
 </body>
