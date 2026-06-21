@@ -41,10 +41,10 @@
 
 <h1>SDSC AAAI27 — 현재 상태 (2026-06-21)</h1>
 <div class="meta">
-  Tag: <code>sdsc-canonical-v9</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
+  Tag: <code>sdsc-canonical-v10</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
   Prior rejections: AAAI26, ICLR26, ICML26 — 모두 reject<br>
-  <span class="tag good">Day 1 Plan G' 진행 중</span> GPT4TS (NeurIPS'23 LLM) sweep 55/90 cells DONE (FAIL=0).<br>
-  <span class="tag warn">⚠️ AC-CL2-3 reframe</span> Section 17.10 retraction: C-5 classifier reads encoder output only (not recon_head output) — classifier-acc bitwise identity across MSE/SDSC/ZCR is <strong>architectural design</strong>, not empirical loss-neutrality. Honest reframe: C-5 demonstrates SDSC <strong>trainable as post-hoc loss</strong> across 4 SSL paradigms (recon_loss values differ as expected per loss). C-4 reconstruction differentiation and cross-domain TOST equivalence remain valid claims.
+  <span class="tag good">✓ Day 1 Plan G' COMPLETE</span> GPT4TS sweep <strong>90/90 DONE, FAIL=0</strong>. Decision gate Option A (STOP at 8 backbones) TRIGGERED.<br>
+  <span class="tag warn">⚠️ AC-CL2-3 honest reframe</span> Section 17.10 retraction (commit 5fbef55): C-5 classifier reads encoder output only — classifier-acc bitwise identity is architectural design, NOT empirical loss-neutrality. Honest reframe: C-5 demonstrates SDSC trainable as post-hoc loss across 4 SSL paradigms; C-4 SDSC reconstruction differentiation + AC-CL2-4 cross-domain TOST 8/9 PASS remain valid.
 </div>
 
 <div class="oneliner">
@@ -263,7 +263,7 @@ d2df843  V1 Tier A — AC-7 PASS                                             ←
 
 <hr style="margin: 3rem 0 1rem; border: none; border-top: 1px solid var(--border);">
 <div class="meta" style="text-align: center;">
-  Generated 2026-06-21 · tag sdsc-canonical-v9 · Plan G' Day 1 in progress (GPT4TS sweep) · Plan v2 decision gate documented
+  Generated 2026-06-21 · tag <strong>sdsc-canonical-v10</strong> · Plan G' Day 1 COMPLETE · 22 commits · 90/90 sweep · Decision gate Option A FIRED · 8-backbone scope LOCKED
 </div>
 
 </body>
