@@ -44,6 +44,7 @@ After GPT4TS sweep ≥85/90 DONE:
 ## Falsification Conditions
 - Falsification 1: If sweep shows >3 FAIL cells → not Option A path; investigate root cause first.
 - Falsification 2: If TS-2024 reviewer simulation (devil's-advocate writeup) returns "outdated benchmark" verdict → Option B trigger regardless of sweep result.
+- Falsification 3: **GPT4TS in_HAR seed42 already shows 1.09% MSE-vs-SDSC diff (under 2% threshold but first non-zero)**. If 3-seed average remains >1%, report as nuanced finding: "GPT4TS loss-neutrality holds within ≤2% tolerance but is NOT bitwise like contrastive backbones — suggests SSL framework type matters for exact head-decoupling." This *strengthens* the differentiation-instrument framing rather than weakening it.
 
 ## Acceptance Criteria for STOP path
 - [ ] Sweep ≥85/90 DONE with 0 FAIL
