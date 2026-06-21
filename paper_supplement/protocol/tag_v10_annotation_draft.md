@@ -19,9 +19,15 @@ SDSC AAAI27 sprint canonical v10 — Plan G' Day 1 complete
 Key results (cross-validated against paper_supplement/protocol/v2_results_summary.md):
 
 In-domain (45/45):
-- 9/9 loss-neutrality cells PASS at <=2% diff
-- 8/9 cells bitwise 0.00% (SimMTM-Cls Epilepsy alone at 0.13%)
-- GPT4TS bitwise 0.00% on all 3 in-domain datasets (LLM paradigm)
+- 9/9 C-5 framework design-verification cells PASS at <=2% threshold
+- 8/9 cells bitwise 0.00% (architectural decoupling — C-5 classifier reads
+  frozen-encoder output, not recon_head output. Verified intent of design.)
+- 1/9 SimMTM-Cls Epilepsy at 0.13% (loss-in-pretrain case — meaningful signal)
+- HONEST REFRAME (commit 5fbef55): "loss-neutrality" interpretation requires
+  the loss-in-pretrain framing (SimMTM-Cls 0.13% case); the 8 decoupled-head
+  cells confirm design integrity but cannot prove empirical loss-equivalence.
+  C-5 contribution is SDSC trainable as post-hoc loss (recon_loss converges)
+  across 4 SSL paradigms.
 
 Cross-domain (45/45):  TODO fill from final sweep
 - N/9 TOST equivalence PASS at delta=2%
