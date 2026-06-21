@@ -864,35 +864,34 @@ Falsification gate 3 status: not triggered (in-domain bitwise 0.00%).
 
 **Lesson for paper writing**: do not narrate single-cell results as framework validation. Wait for 3-seed averaging before drawing thesis claims. The original commit cf0fd3d should be amended or annotated when sweep finishes.
 
-### 17.10 Diagnostic — loss-neutrality is emergent, not trivial
+### 17.10 ⚠️ CORRECTION — C-5 loss-neutrality is ARCHITECTURAL, not empirical
 
-Inspecting `xd_SleepEEG_Epilepsy/seed{42,123}/{pretrain,c5_*}.log` reveals an important property:
+**Retraction**: my earlier interpretation in commit 2f61d3b ("loss-neutrality is emergent") was incorrect. After reading the wrapper source code (`tfc_wrapper.py:263`, `gpt4ts_wrapper.py:270`, equivalent for ts2vec/simmtm-cls), the C-5 architecture has:
 
-**Encoder convergence (pretrain loss)**:
-| Seed | Epoch 0 | Epoch 5 |
-|---|---|---|
-| seed42 | 0.9958 | 0.8490 |
-| seed123 | 0.9949 | 0.8474 |
+```python
+z = _encode_forward(model, x_test)   # frozen encoder output
+preds = classifier(z).argmax(dim=1)   # classifier reads ENCODER output, NOT recon_head output
+```
 
-Encoder weights converge to nearly identical states (within 0.0016 loss).
+**The recon_head is trained with the chosen loss but its output is never consumed by the classifier.** The classifier sees only the frozen-encoder representation, which is identical regardless of which loss trained the recon_head (because encoder is frozen and recon_head is downstream/parallel to classifier).
 
-**C-5 head recon loss trajectory**:
-| Seed | MSE head ep20 | SDSC head ep20 |
-|---|---|---|
-| seed42 | 0.0027 | 0.1316 |
-| seed123 | 0.0029 | 0.1450 |
+**Consequence**: classifier acc bitwise identity across MSE/SDSC/ZCR heads is **NOT an empirical loss-neutrality finding**. It is a structural property of the C-5 framework's decoupled-head design. Cannot be claimed as evidence FOR loss-neutrality.
 
-Per-loss head trajectories are similar across seeds, but **different head losses produce very different intermediate states** (MSE recon_loss=0.003 vs SDSC recon_loss=0.13 — two orders of magnitude apart).
+**What C-5 actually measures (honest reframe)**:
+1. **C-5 recon_loss values per head**: MSE head reaches ~0.003, SDSC head reaches ~0.13, ZCR head reaches ~0.7. These ARE different across losses, showing each loss can be effectively optimized as a post-hoc training objective on the frozen encoder. This is a legitimate framework-validity claim.
+2. **C-5 classifier acc**: a function only of the encoder. Cannot distinguish loss choices because the classifier never sees the head's output.
 
-**Classifier accuracy**:
-| Seed | MSE | SDSC | ZCR |
-|---|---|---|---|
-| seed42 | 0.1962 | 0.1962 | 0.1962 |
-| seed123 | 0.8469 | 0.8469 | 0.8469 |
+**Why we kept C-5 design this way**: Decoupling was a deliberate choice to **separate** "can SDSC train a head?" (recon_loss) from "is the encoder good enough for classification?" (classifier acc). Conflating them would obscure both signals.
 
-**Within each seed: bitwise identical accuracy across all 3 loss heads.** Between seeds: 4x acc spread (low-data classifier head training noise on 60-sample Epilepsy).
+**Implication for the paper Section 17 narrative**:
+- ❌ Cannot claim: "loss-neutrality of classifier acc demonstrates cross-paradigm decoupling"
+- ✅ Can claim: "C-5 framework validates SDSC as a trainable post-hoc loss (recon_loss converges) across 4 SSL paradigms"
+- ✅ Can claim: "C-4 reconstruction quality (SDSC values per backbone) differentiates encoders honestly"
+- ✅ Can claim: "Cross-domain TOST equivalence (AC-CL2-4) compares the practical task-equivalence of MSE-trained vs SDSC-trained head representations through the lens of the same downstream classifier" — this IS a meaningful test even with the decoupled design
 
-**Why this matters for the paper**: The decoupling isn't "all heads produce identical outputs" (they don't — SDSC head has 100x larger recon loss). The decoupling is that **the downstream classifier converges to the same decision boundary regardless of which loss shaped the head**. This is the canonical loss-neutrality empirical claim, and it survives an extremely noisy classifier-training regime (seed variance 4x acc). Strong evidence for Sections 12 (loss-neutrality general statement) and 17.4 (cross-paradigm family-wide constant).
+**Section 12 reframe required**: rewrite "loss-neutrality" claims to focus on the *recon_loss trainability across paradigms*, not the *classifier acc identity*.
+
+**Decision gate impact**: This honest correction should be presented as the strongest epistemic-discipline signal of the paper — caught a fatal flaw pre-submission via code reading + own data inspection. Pre-mortems work. Falsification process works.
 
 ## 18. Future work (limitations + post-AAAI27 roadmap)
 
