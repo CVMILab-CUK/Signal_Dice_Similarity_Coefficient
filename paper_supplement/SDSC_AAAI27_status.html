@@ -43,11 +43,11 @@
 <div class="meta">
   Tag: <code>sdsc-canonical-v9</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
   Prior rejections: AAAI26, ICLR26, ICML26 — 모두 reject<br>
-  <span class="tag good">Day 1 Plan G' 진행 중</span> GPT4TS (NeurIPS'23 LLM paradigm) sweep 39/90 cells DONE, FAIL=0 — 4번째 classification backbone 통합 중. Tag <code>v10</code> 예정.
+  <span class="tag good">Day 1 Plan G' 진행 중</span> GPT4TS (NeurIPS'23 LLM) sweep 45/90 cells DONE (FAIL=0). <strong>In-domain 45/45 COMPLETE → 9/9 loss-neutral PASS, 8/9 bitwise 0.00%</strong>. Cross-domain phase (45 cells) 진행 중. Tag <code>v10</code> 예정.
 </div>
 
 <div class="oneliner">
-<strong>한 줄:</strong> Forecasting paper의 V1(metric)+V3(model selection)+AC-6(TOST) 완료 = AAAI-clean path 확정. Classification 트랙도 cross-backbone(3 SSL families) 6/6 in-domain loss-neutral + 5/6 cross-domain TOST 통과 = 이전 reject 사유(QVmd cross-domain 모순, 4Zmu in-domain only, 5F1V single backbone) 직접 대응 evidence 확보.
+<strong>한 줄:</strong> Forecasting paper의 V1(metric)+V3(model selection)+AC-6(TOST) 완료 = AAAI-clean path 확정. Classification 트랙은 4 SSL families (masked + contrastive×2 + LLM) <strong>9/9 in-domain loss-neutral PASS</strong> (8/9 bitwise 0.00%) + 5/6 cross-domain TOST 통과 (cross-domain GPT4TS 추가 진행 중) = 이전 reject 사유(QVmd cross-domain 모순, 4Zmu in-domain only, 5F1V single backbone) 직접 대응.
 </div>
 
 <!-- ============================================================ -->
