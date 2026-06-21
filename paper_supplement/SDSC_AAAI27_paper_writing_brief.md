@@ -839,30 +839,36 @@ GPT4TS in-domain accuracies (3-seed average, frozen LM + post-hoc head):
 
 **Most important headline**: SDSC ranking varies meaningfully across (backbone, dataset) — i.e., SDSC differentiates encoder quality. This **strengthens C-4 generalization claim** that SDSC works as a measurement instrument across paradigms (contrastive, masked, and now LLM).
 
-### 17.9 Cross-domain preliminary (xd_SleepEEG_Epilepsy 2 seeds, 55/90)
+### 17.9 Cross-domain xd_SleepEEG_Epilepsy 3-seed FINAL (60/90)
 
-**Correction from prior commit (cf0fd3d)**: My earlier writeup over-interpreted seed42 (0.196 catastrophic acc) as a "framework-validating" structural-vs-task divergence. With seed123 now done at **0.847** (normal range), the seed42 result is revealed as a single-seed outlier, not a paradigm-level failure. Honest reporting requires correcting the narrative.
+**Third correction (post 1-seed, 2-seed, and now 3-seed reads)**: 3-seed picture is **bimodal training instability**, not "seed42 catastrophic outlier" nor "seed123 normal majority".
 
-| Seed | C-4 SDSC | C-5 MSE acc | C-5 SDSC acc | C-5 ZCR acc | Loss-neutrality |
+| Seed | C-4 SDSC | C-5 MSE acc | C-5 SDSC acc | C-5 ZCR acc | Per-seed loss-identity |
 |---|---|---|---|---|---|
-| seed42 | 0.9670 | 0.1962 | 0.1962 | 0.1962 | bitwise 0.00% (outlier acc) |
-| seed123 | 0.9641 | 0.8469 | 0.8469 | 0.8469 | bitwise 0.00% (normal acc) |
-| seed2024 | pending | pending | pending | pending | — |
-| **2-seed avg** | **0.9656** | **0.5216** | **0.5216** | **0.5216** | **bitwise 0.00%** |
+| seed42 | 0.9670 | 0.1962 | 0.1962 | 0.1962 | bitwise (chance) |
+| seed123 | 0.9641 | 0.8469 | 0.8469 | 0.8469 | bitwise (works) |
+| seed2024 | (pending json field) | 0.1848 | 0.1848 | 0.1848 | bitwise (chance) |
+| **3-seed mean** | **~0.965** | **0.4093** | **0.4093** | **0.4093** | bitwise |
+| **3-seed median** | — | **0.1962** | **0.1962** | **0.1962** | bitwise |
+| **3-seed std** | — | **0.38** | **0.38** | **0.38** | — |
 
-**What this actually shows (revised)**:
-1. **Loss-neutrality holds bitwise within each seed** even when downstream acc varies wildly (0.20 → 0.85). Strong evidence for decoupled-head design generalization to LLM paradigm.
-2. **C-4 SDSC reconstruction is robust across seeds** (0.9670/0.9641 — within 0.003 of each other). The encoder representation is stable; downstream classifier head training is what varies by seed initialization.
-3. **The "metric-not-task" framing still holds** as a general principle — C-4 measures reconstruction structure regardless of downstream noise — but we cannot use this 2-seed data as direct evidence. The seed-to-seed variance ON c5 classifier acc (0.20 vs 0.85) on the same encoder is the real cautionary tale: small-target-dataset classification (Epilepsy = 60 train samples) is fragile, not the SDSC framework.
+**What this actually shows (3-seed final)**:
+1. **C-5 classifier training is bimodal**, NOT Gaussian — 2/3 seeds land near chance (~0.19), 1/3 lands at strong transfer (0.85). Catastrophic seed-instability pattern.
+2. **Mean (0.41) is NOT informative**; report median (0.196) and std (0.38) instead. Distribution is bimodal, not unimodal.
+3. **C-4 SDSC reconstruction (~0.965) is robust across seeds** — encoder representations are stable; classifier head fragility is what varies.
+4. **Per-seed loss-identity (MSE=SDSC=ZCR bitwise per seed) holds across all 3 seeds** — confirms the C-5 decoupled-head architectural property (NOT empirical loss-neutrality, per Section 17.10 retraction).
 
-**Loss-neutrality cross-domain (2/9 cells)**: GPT4TS xd_SleepEEG_Epilepsy both seeds MSE=SDSC=ZCR bitwise identical. Decoupled-head pattern HOLDS across both extreme acc points. Cross-paradigm consistency confirmed.
+**Honest take on what cross-domain GPT4TS adds**:
+- A **failure case for GPT4TS frozen-LM transfer** to small-target classification (Epilepsy = 60 train samples)
+- C-4 reconstruction is **excellent regardless** (SDSC=0.965 mean)
+- This is exactly the kind of "C-4 high, C-5 low" pattern that motivates SDSC: structural reconstruction and downstream usefulness are distinct quality axes
 
-**Remaining 35 cells** = SleepEEG_Epilepsy seed2024 (5) + SleepEEG_Gesture × 3 seeds (15) + ECG_Epilepsy × 3 seeds (15). ETA ~3h.
+**Remaining 30 cells** = SleepEEG_Gesture × 3 seeds (15) + ECG_Epilepsy × 3 seeds (15). ETA ~2h.
 
-Falsification gate 1 status: not triggered (loss-neutrality holds even at 0.20 acc).
-Falsification gate 3 status: not triggered (in-domain bitwise 0.00%).
+Falsification gate 1 status: not triggered (per-seed bitwise loss-identity holds even in chance regime).
+Falsification gate 3 status: not triggered (in-domain bitwise 0.00% holds for all 4 backbones).
 
-**Lesson for paper writing**: do not narrate single-cell results as framework validation. Wait for 3-seed averaging before drawing thesis claims. The original commit cf0fd3d should be amended or annotated when sweep finishes.
+**Lesson for paper writing (cumulative across 3 successive corrections this session)**: 1-2 seed observations are insufficient for ANY narrative claim. The first 1-seed read (cf0fd3d: "framework-validating") was wrong. The 2-seed read (8f937c3: "seed42 was outlier") was also wrong. The 3-seed read reveals bimodal instability — neither prior narrative survives. **Report the distribution, not the mean. Use median + std for non-Gaussian data.** This epistemic discipline trail (3 wrong → 1 right) is itself paper-worthy methodology evidence.
 
 ### 17.10 ⚠️ CORRECTION — C-5 loss-neutrality is ARCHITECTURAL, not empirical
 
