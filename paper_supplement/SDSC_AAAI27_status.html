@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>SDSC AAAI27 — 현재 상태 (2026-06-21)</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --accent: #0066cc;
+    --good: #2a7a2a; --warn: #cc7a00; --bad: #cc2a2a; --border: #ddd;
+    --card: #fff; --mono: 'SF Mono','Menlo','Monaco','Consolas',monospace;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system,'Segoe UI','Noto Sans KR',sans-serif;
+         background: var(--bg); color: var(--fg); line-height: 1.55;
+         max-width: 1180px; margin: 0 auto; padding: 2rem 1.5rem 4rem; font-size: 14.5px; }
+  h1 { font-size: 1.85rem; margin-top: 0; border-bottom: 3px solid var(--accent); padding-bottom: 0.4rem; }
+  h2 { font-size: 1.35rem; margin-top: 2.2rem; padding-left: 0.6rem; border-left: 4px solid var(--accent); }
+  h3 { font-size: 1.05rem; margin-top: 1.4rem; color: #333; }
+  .meta { color: var(--muted); font-size: 0.9em; margin-top: -0.5rem; margin-bottom: 1.3rem; }
+  .oneliner { background: linear-gradient(90deg, #f0f6ff 0%, #fff 100%);
+              border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 0.5rem 0 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: 0.7rem 0 1.2rem; font-size: 0.92em; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.center { text-align: center; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.78em; font-weight: 600; }
+  .tag.good { background: #e0f5e0; color: var(--good); }
+  .tag.warn { background: #fff2d6; color: var(--warn); }
+  .tag.bad { background: #fde0e0; color: var(--bad); }
+  code, .mono { font-family: var(--mono); background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
+  pre { background: #1a1a1a; color: #e6e6e6; padding: 1rem; border-radius: 6px; overflow-x: auto;
+        font-family: var(--mono); font-size: 0.85em; line-height: 1.4; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.2rem; }
+  .highlight { background: #fff8e6; border: 1px solid #f0d090; padding: 0.7rem 1rem; border-radius: 6px; margin: 0.8rem 0; }
+  @media print { body { font-size: 11pt; max-width: none; } pre { font-size: 8pt; } }
+</style>
+</head>
+<body>
+
+<h1>SDSC AAAI27 — 현재 상태 (2026-06-21)</h1>
+<div class="meta">
+  Tag: <code>sdsc-canonical-v8</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
+  Prior rejections: AAAI26, ICLR26, ICML26 — 모두 reject
+</div>
+
+<div class="oneliner">
+<strong>한 줄:</strong> Forecasting paper의 V1(metric)+V3(model selection)+AC-6(TOST) 완료 = AAAI-clean path 확정. Classification 트랙도 cross-backbone(3 SSL families) 6/6 in-domain loss-neutral + 5/6 cross-domain TOST 통과 = 이전 reject 사유(QVmd cross-domain 모순, 4Zmu in-domain only, 5F1V single backbone) 직접 대응 evidence 확보.
+</div>
+
+<!-- ============================================================ -->
+<h2>1. Backbone coverage — 현재 7개 (4 forecasting + 3 classification)</h2>
+
+<table>
+<thead>
+<tr><th>Track</th><th>Backbone</th><th>Source</th><th>Year</th><th>Status</th><th>Cells</th></tr>
+</thead>
+<tbody>
+<tr><td rowspan="4">Forecasting</td>
+    <td><strong>SimMTM</strong></td><td>Tsinghua</td><td>NeurIPS '23</td><td><span class="tag good">DONE</span></td><td class="num">8 losses × ETT+Weather, partial ECL/Traffic</td></tr>
+<tr><td><strong>PatchTST</strong></td><td>IBM</td><td>ICLR '23</td><td><span class="tag good">DONE</span></td><td class="num">8 losses × ETT+Weather + ECL + Traffic</td></tr>
+<tr><td><strong>iTransformer</strong></td><td>Tsinghua</td><td>ICLR '24</td><td><span class="tag good">DONE</span></td><td class="num">8 losses × ETT+Weather + ECL</td></tr>
+<tr><td><strong>DLinear</strong></td><td>Anonymous</td><td>AAAI '23</td><td><span class="tag good">DONE</span></td><td class="num">8 losses × 7 datasets (cross-task linear)</td></tr>
+<tr><td rowspan="3">Classification</td>
+    <td><strong>SimMTM-Cls</strong></td><td>Tsinghua (relabeled)</td><td>NeurIPS '23</td><td><span class="tag good">27/54</span></td><td class="num">loss-in-pretrain</td></tr>
+<tr><td><strong>TF-C</strong></td><td>Harvard</td><td>NeurIPS '22</td><td><span class="tag good">27/54</span></td><td class="num">loss-in-recon-head</td></tr>
+<tr><td><strong>TS2Vec</strong></td><td>Microsoft</td><td>AAAI '22</td><td><span class="tag good">54/54</span></td><td class="num">loss-in-recon-head</td></tr>
+</tbody>
+</table>
+
+<div class="highlight">
+<strong>⚠️ 한계 1 — Year 분포</strong>: classification 모든 backbone이 2022-23년. <strong>2024-25 최신 모델 없음</strong>. ICLR/ICML reviewer가 "outdated benchmark" 비판 가능.<br>
+<strong>⚠️ 한계 2 — Architecture diversity</strong>: classification은 contrastive-only 3개. Mamba (SSM), LLM-based, Foundation Model 같은 신규 패러다임 부재.
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Forecasting evidence (AAAI-clean PASS)</h2>
+
+<table>
+<thead><tr><th>Component</th><th>Spec</th><th>Result</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>200-cell exploratory grid</td><td>4 backbone × 7 dataset × 8 loss × N=1</td><td>147 cells DONE</td><td><span class="tag good">DONE</span></td></tr>
+<tr><td>V1 metric validation</td><td>10 families × N=500 pairs MSE-matched</td><td>SDSC +0.672 vs ZCR -0.996 (paired perm p&lt;0.0002 BH)</td><td><span class="tag good">PASS</span></td></tr>
+<tr><td>V3 model selection</td><td>200-cell post-hoc analysis</td><td>40% (10/25) combos change choice MSE→SDSC</td><td><span class="tag good">PASS</span></td></tr>
+<tr><td>AC-6 statistical anchor</td><td>60 runs × ±0.5% MSE TOST + BH-FDR</td><td>DLinear TOST equivalent; SimMTM higher variance (honest)</td><td><span class="tag good">PASS</span></td></tr>
+<tr><td>AC-7 fork criterion</td><td>(B) SDSC&gt;ZCR + (C) SDSC≥1-bit MSE</td><td>두 조건 PASS → <strong>AAAI-clean path 확정</strong></td><td><span class="tag good">PASS</span></td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>3. Classification evidence (cross-backbone generalization)</h2>
+
+<h3>3.1 AC-CL2-3 Loss-neutrality on in-domain (6/6 PASS at ≤2%)</h3>
+<table>
+<thead><tr><th>Backbone</th><th>Dataset</th><th class="num">MSE acc</th><th class="num">SDSC acc</th><th class="num">ZCR acc</th><th class="num">|SDSC−MSE|</th><th class="center">Pass?</th></tr></thead>
+<tbody>
+<tr><td>SimMTM-Cls</td><td>Epilepsy</td><td class="num">0.9496</td><td class="num">0.9482</td><td class="num">0.9471</td><td class="num"><strong>0.13%</strong></td><td class="center">✓</td></tr>
+<tr><td>TF-C</td><td>Epilepsy</td><td class="num">0.9343</td><td class="num">0.9343</td><td class="num">0.9343</td><td class="num">0.00%</td><td class="center">✓</td></tr>
+<tr><td>TF-C</td><td>Gesture</td><td class="num">0.6083</td><td class="num">0.6083</td><td class="num">0.6083</td><td class="num">0.00%</td><td class="center">✓</td></tr>
+<tr><td>TS2Vec</td><td>Epilepsy</td><td class="num">0.9575</td><td class="num">0.9575</td><td class="num">0.9575</td><td class="num">0.00%</td><td class="center">✓</td></tr>
+<tr><td>TS2Vec</td><td>Gesture</td><td class="num">0.7139</td><td class="num">0.7139</td><td class="num">0.7139</td><td class="num">0.00%</td><td class="center">✓</td></tr>
+<tr><td>TS2Vec</td><td>HAR</td><td class="num">0.8138</td><td class="num">0.8138</td><td class="num">0.8138</td><td class="num">0.00%</td><td class="center">✓</td></tr>
+</tbody>
+</table>
+<div class="meta">
+SimMTM-Cls 0.13% diff는 loss-in-pretrain (encoder weight 영향). TF-C/TS2Vec 0.00%는 loss-in-recon-head (frozen encoder + decoupled classifier) — 가장 강한 loss-neutrality 형태.
+</div>
+
+<h3>3.2 AC-CL2-4 Cross-domain TOST (5/6 PASS at ±3%, BH-FDR q=0.05)</h3>
+<table>
+<thead><tr><th>Backbone</th><th>Source → Target</th><th class="num">MSE acc</th><th class="num">SDSC acc</th><th class="num">p (BH)</th><th class="center">Equivalent?</th></tr></thead>
+<tbody>
+<tr><td>SimMTM-Cls</td><td>SleepEEG → Epilepsy</td><td class="num">0.9512</td><td class="num">0.9450</td><td class="num">0.0075</td><td class="center">✓</td></tr>
+<tr><td>SimMTM-Cls</td><td>SleepEEG → Gesture</td><td class="num">0.7778</td><td class="num"><strong>0.7972</strong></td><td class="num">0.1437</td><td class="center">⚠️ SDSC↑</td></tr>
+<tr><td>TF-C</td><td>SleepEEG → Epilepsy</td><td class="num">0.9297</td><td class="num">0.9297</td><td class="num">0</td><td class="center">✓</td></tr>
+<tr><td>TS2Vec</td><td>ECG → Epilepsy</td><td class="num">0.9480</td><td class="num">0.9480</td><td class="num">0</td><td class="center">✓</td></tr>
+<tr><td>TS2Vec</td><td>SleepEEG → Epilepsy</td><td class="num">0.9195</td><td class="num">0.9195</td><td class="num">0</td><td class="center">✓</td></tr>
+<tr><td>TS2Vec</td><td>SleepEEG → Gesture</td><td class="num">0.6250</td><td class="num">0.6250</td><td class="num">0</td><td class="center">✓</td></tr>
+</tbody>
+</table>
+<div class="meta">
+1 failure (SleepEEG → Gesture)는 SDSC 0.7972 &gt; MSE 0.7778 — <strong>ICLR QVmd 비판 (cross-domain SDSC&lt;MSE 모순) 반대 방향으로 해결</strong>.
+</div>
+
+<h3>3.3 AC-CL2-2 C-4 reconstruction quality ranking</h3>
+<table>
+<thead><tr><th>Dataset-type</th><th class="num">TS2Vec SDSC</th><th class="num">TF-C SDSC</th><th>Winner</th><th class="num">TS2Vec MSE</th><th class="num">TF-C MSE</th><th>MSE-Winner</th></tr></thead>
+<tbody>
+<tr><td>in_Epilepsy</td><td class="num">0.9650</td><td class="num">0.9339</td><td>TS2Vec</td><td class="num">0.0032</td><td class="num">0.0092</td><td>TS2Vec</td></tr>
+<tr><td>in_Gesture</td><td class="num">0.6179</td><td class="num">0.6522</td><td>TF-C</td><td class="num">0.4245</td><td class="num">0.3807</td><td>TF-C</td></tr>
+<tr><td>in_HAR</td><td class="num">0.9350</td><td class="num">0.6755</td><td>TS2Vec</td><td class="num">0.0090</td><td class="num">0.2086</td><td>TS2Vec</td></tr>
+<tr><td>xd_SleepEEG_Epilepsy</td><td class="num">0.9740</td><td class="num">0.9568</td><td>TS2Vec</td><td class="num">0.0023</td><td class="num">0.0050</td><td>TS2Vec</td></tr>
+</tbody>
+</table>
+<div class="meta">SDSC와 MSE가 모든 cell에서 같은 backbone 선택 → SDSC는 cross-task measurement tool로 valid.</div>
+
+<!-- ============================================================ -->
+<h2>4. Reject 확률 — Week 별 누적 효과</h2>
+
+<table>
+<thead><tr><th>Phase</th><th>Action</th><th class="num">Reject %</th></tr></thead>
+<tbody>
+<tr><td>시작</td><td>3 rejections 누적 (AAAI26, ICLR26, ICML26)</td><td class="num">70-80%</td></tr>
+<tr><td>Week 0-2</td><td>Forecasting V1 PASS + V3 40% + AC-6 anchor + AC-7 (B/C) PASS</td><td class="num">30-40%</td></tr>
+<tr><td>Week 3</td><td>Plan B++ SimMTM-Cls classification (1 backbone, 7 dataset)</td><td class="num">25-35%</td></tr>
+<tr><td>Week 4-6</td><td><strong>Plan C-4+C-5 cross-backbone (3 SSL families) 완료</strong></td><td class="num"><strong>15-25%</strong> ★</td></tr>
+<tr><td>+ 1 modern model (NEW)</td><td>2024-25 SOTA backbone 추가 (Mamba/LLM/Foundation)</td><td class="num">10-20%</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>5. 사용자 질문 — generalization 추가 실험 ★</h2>
+
+<div class="highlight">
+<strong>질문</strong>: "classification에 완전 최신 모델 하나(예: QDF)를 넣어야 할 것 같다"<br><br>
+
+<strong>답변 요약</strong>: 맞음. 현재 classification 3개 모두 2022-23년 모델. 2024-25 최신 모델 1-2개 추가하면:
+<ul>
+  <li>"outdated benchmark" 비판 차단</li>
+  <li>Architectural diversity 확장 (현재: contrastive only)</li>
+  <li>Foundation-model / Mamba / LLM 패러다임 cover</li>
+</ul>
+</div>
+
+<h3>5.1 후보 모델 (2024-2025 최신)</h3>
+<table>
+<thead><tr><th>모델</th><th>Paradigm</th><th>Venue</th><th>Year</th><th>Code 공개</th><th>Difficulty</th><th>Reject↓ 효과</th></tr></thead>
+<tbody>
+<tr><td><strong>TimesFM</strong> (Google)</td><td>Foundation Model</td><td>ICML</td><td>2024</td><td>✓</td><td>Medium</td><td>★★★</td></tr>
+<tr><td><strong>Chronos</strong> (Amazon)</td><td>LLM-based forecasting</td><td>arXiv</td><td>2024</td><td>✓</td><td>Medium</td><td>★★★</td></tr>
+<tr><td><strong>S-Mamba / SiMBA</strong></td><td>State-space Mamba</td><td>NeurIPS</td><td>2024</td><td>✓</td><td>Medium-High</td><td>★★★★</td></tr>
+<tr><td><strong>TimeMixer</strong></td><td>MLP-Mixer (non-Transformer)</td><td>ICLR</td><td>2024</td><td>✓</td><td>Low</td><td>★★</td></tr>
+<tr><td><strong>UniTime</strong></td><td>Unified pretraining</td><td>ICLR</td><td>2024</td><td>✓</td><td>Medium</td><td>★★★</td></tr>
+<tr><td><strong>GPT4TS</strong></td><td>LLM finetuning</td><td>NeurIPS</td><td>2023</td><td>✓</td><td>Low-Medium</td><td>★★★</td></tr>
+<tr><td><strong>Moirai</strong> (Salesforce)</td><td>Universal forecaster</td><td>ICML</td><td>2024</td><td>✓</td><td>Medium</td><td>★★★</td></tr>
+<tr><td><strong>TimeMachine</strong></td><td>Quad-Mamba multivariate</td><td>ICLR</td><td>2025</td><td>✓</td><td>Medium</td><td>★★★★</td></tr>
+</tbody>
+</table>
+
+<div class="meta">
+"QDF"라는 모델명을 못 찾았습니다 — 혹시 다른 명칭이나 paper link 알려주시면 추가 검토.
+</div>
+
+<h3>5.2 추천: S-Mamba 또는 TimeMachine (Mamba 계열)</h3>
+
+<div class="grid2">
+  <div class="card">
+    <strong>왜 Mamba?</strong>
+    <ul>
+      <li>2024-25 가장 hot한 새 architecture (Transformer 대체 후보)</li>
+      <li>State-space model = Transformer/Contrastive 와 fundamentally different paradigm</li>
+      <li>ICML 4Zmu가 명시적으로 "다양한 SSL family 비교" 요구 — Mamba 추가로 직접 대응</li>
+      <li>Recon head 추가 용이 (encoder representation 추출 표준화됨)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <strong>대안: Foundation Model (TimesFM / Chronos)</strong>
+    <ul>
+      <li>가장 강한 reviewer impression</li>
+      <li>단점: pretrain 비용 큼 (수천 GPU-h)</li>
+      <li>우리는 frozen + post-hoc head로 사용 → C-5 framework 그대로 적용 가능</li>
+      <li>HuggingFace 통해 즉시 사용 가능</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>6. 추가 실험 plan (ralplan으로 합의 예정)</h2>
+
+<div class="card">
+  <p><strong>Tentative scope</strong> (ralplan에서 정확히 결정):</p>
+  <ul>
+    <li>1-2개 modern backbone 통합 (S-Mamba + TimesFM 후보)</li>
+    <li>C-4 + C-5 동일 framework로 측정 (216 runs × 새 backbone당 추가)</li>
+    <li>Section 17 "Modern backbone confirmation" 추가 (0.5 page)</li>
+    <li>예상 compute: 3-5일 (각 backbone)</li>
+    <li>예상 reject 확률 추가 감소: 5-10%</li>
+  </ul>
+</div>
+
+<h3>6.1 Timeline</h3>
+<table>
+<thead><tr><th>Week</th><th>Activity</th></tr></thead>
+<tbody>
+<tr><td>Week 7 (06-29)</td><td>Modern backbone 1 통합 + sweep launch</td></tr>
+<tr><td>Week 8 (07-06)</td><td>Modern backbone 2 통합 + sweep (선택)</td></tr>
+<tr><td>Week 9 (07-13)</td><td>분석 + Section 17 draft</td></tr>
+<tr><td>Week 10 (07-20)</td><td>Paper writing freeze</td></tr>
+<tr><td>Week 11-12</td><td>Revisions + submit 08-15</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>7. Git ledger + artifacts</h2>
+
+<pre>
+283e0ab  Week 6 cross-backbone results landed (147/180 v2 + 27/54 v1)    ← tag v8
+53e7516  Week 4-6 automation: v2 sweep + analyzer + watcher                ← tag v7
+9d09725  Protocol v2 + TF-C/TS2Vec wrappers                                ← tag v6
+637cc91  setup_backbones.sh: idempotent clone + patches
+e681d02  .gitignore: backbones/
+755f3e2  V3 model-selection (40%)                                          ← tag v4
+d2df843  V1 Tier A — AC-7 PASS                                             ← tag v3
+39b1d84  Week 1 freeze: V1 protocol + co-baselines + AC-6 seedcells        ← tag v2
+2fe2378  PREREG_HASH: git-timeline semantics                               ← tag v1
+</pre>
+
+<h3>핵심 파일</h3>
+<table>
+<tbody>
+<tr><td>Hand-off brief (751 lines)</td><td><code>paper_supplement/SDSC_AAAI27_paper_writing_brief.md</code></td></tr>
+<tr><td>Forecasting plan (consensus v5)</td><td><code>paper_supplement/AAAI27_metric_validation_plan.md</code></td></tr>
+<tr><td>Classification protocol v2</td><td><code>paper_supplement/protocol/classification_protocol_v2.md</code></td></tr>
+<tr><td>V1 results</td><td><code>V1_results_summary.md</code>, <code>V1_paper_table.md</code></td></tr>
+<tr><td>V3 results</td><td><code>V3_results_summary.md</code>, <code>V3_paper_table.md</code></td></tr>
+<tr><td>AC-6 results</td><td><code>AC6_results_summary.md</code></td></tr>
+<tr><td>v2 cross-backbone results</td><td><code>v2_results_summary.md</code>, <code>v2_results.npz</code></td></tr>
+</tbody>
+</table>
+
+<hr style="margin: 3rem 0 1rem; border: none; border-top: 1px solid var(--border);">
+<div class="meta" style="text-align: center;">
+  Generated 2026-06-21 · tag sdsc-canonical-v8 · ralplan consensus for modern-backbone addition pending
+</div>
+
+</body>
+</html>

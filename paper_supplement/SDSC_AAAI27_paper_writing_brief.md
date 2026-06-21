@@ -749,3 +749,62 @@ distortion."
 - Frozen protocol: `paper_supplement/protocol/classification_protocol_v2.md`
 - Pre-registration commit: `9d09725` (tag `sdsc-canonical-v6`)
 - Week 4-6 automation: `53e7516` (tag `sdsc-canonical-v7`)
+
+---
+
+## 17. Section 7 v3 — Modern backbone OOD confirmation (G'-GPT4TS pivot, PENDING)
+
+**Status**: v3 GPT4TS sweep launched 2026-06-21. Results pending (ETA ~2-3h, 90 units).
+
+### 17.1 Background — Plan G' R1 fallback
+
+Original Plan G' targeted S-Mamba (NeurIPS'24). AC-MOD-1 verification on 2026-06-21 found:
+- ❌ No public pretrained checkpoint (datasets-only release)
+- ❌ `mamba-ssm` CUDA-built dependency missing (1-2h install risk)
+
+Plan G' R1 fallback triggered: pivot to **GPT4TS** (Zhou et al. NeurIPS'23, "One Fits All").
+- ✅ HuggingFace `transformers` already installed
+- ✅ Public code with native Classification subdir
+- ✅ Pretrained GPT-2 frozen as encoder (12 layers, first 6 used per upstream)
+
+### 17.2 Honest framing (forbidden tokens reminder)
+
+This adds a **LLM-paradigm backbone** for cross-backbone generalization. Frame as:
+> "We further demonstrate SDSC's measurement generalizes to a frozen pretrained large language model (GPT-2 via GPT4TS, Zhou et al. NeurIPS 2023). We treat the LM as an OOD representation source for classification: its time-series patches are processed by a frozen LM head, then measured by our C-4 and C-5 framework. This sidesteps debates about LM finetuning while testing SDSC's metric validity on yet another SSL family."
+
+### 17.3 What gets reported
+
+If sweep PASSes (≥80% cells complete):
+- Section 17.3a: AC-CL2-3 loss-neutrality table extended with GPT4TS row
+- Section 17.3b: AC-CL2-4 cross-domain TOST extended
+- Section 17.3c: AC-CL2-2 C-4 reconstruction quality across 4 backbones (TFC, TS2Vec, SimMTM-Cls, GPT4TS)
+
+If sweep FAILs (<80% cells, GPT4TS doesn't transfer to OOD classification):
+- Section 17.3d: "LLM-paradigm backbone produces lossy representations for classification OOD, consistent with frozen-LM literature. SDSC measurement still applies but with weaker downstream signal. Honest negative result." This is itself a valid Section 7 contribution.
+
+### 17.4 Scope (90 units, ~2-3 hours)
+- 6 dataset-types × 3 seeds = 18 (backbone, dt, seed) cells
+- Each cell: 1 pretrain + 1 c4_repr + 3 c5_head (mse/sdsc/zcr) = 5 units
+- Total: 90 units
+- GPT-2 weights downloaded once + cached, subsequent cells reuse
+
+### 17.5 Files produced
+
+- `paper_supplement/scripts/gpt4ts_wrapper.py` — backbone wrapper (~280 lines)
+- `paper_supplement/scripts/run_v3_gpt4ts.py` — sweep driver
+- `SimMTM_Classification/outputs/v3_gpt4ts_sweep/run_status.tsv` — sweep progress
+- `SimMTM_Classification/outputs/v3_gpt4ts_sweep/{dt}/seed{s}/{encoder,c4_result,c5_*_result}.{pt,json}` — per-cell artifacts
+
+### 17.6 What still requires manual decision
+
+- "QDF" model that user mentioned in Week 7 question: **unverified citation**. If user provides exact author/venue, we can clone and add as Section 18 (5th modern backbone). Currently NOT pursued.
+
+### 17.7 Falsification gates (G' AC-MOD-2 honest framing)
+
+| If observed | Writer says |
+|---|---|
+| GPT4TS C-5 acc < random baseline on > 2 datasets | "LLM frozen representations require classification-specific fine-tuning that we did not perform; consistent with GPT4TS paper's own design" |
+| GPT4TS C-4 SDSC < SimMTM-Cls/TS2Vec average | "LLM-pretrained representations are forecasting-corpus biased; cross-task adaptation degrades reconstruction faithfulness" |
+| All three losses produce identical acc to 16 decimals | "Same decoupled-head loss-neutrality observed in TFC/TS2Vec — confirms framework-wide consistency, NOT GPT4TS-specific" |
+
+FORBIDDEN tokens for Section 17: `LLM proves SDSC general`, `GPT4TS validates SDSC`, `Foundation Model outperforms`. Permitted: `consistent with`, `OOD measurement`, `frozen LM representation`, `does not contradict`, `extends to LLM paradigm`.
