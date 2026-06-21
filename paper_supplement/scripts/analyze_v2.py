@@ -74,16 +74,17 @@ def collect_v2():
 
 
 def collect_v1_simmtm_cls():
-    """SimMTM-Cls v1 sweep produces test_results in different filename layout.
-    Parse from filename: {cell_id}_seed{seed}.json where cell_id matches v1 schema.
-    Returns c5_simmtm[(dt_id, seed, loss)] = accuracy."""
+    """SimMTM-Cls v1 sweep writes per-cell .log files (not JSON). Parse the
+    final 'EP20 - Best Testing: Acc=...' line from each log.
+    Returns c5_simmtm[(dt_id, seed, loss)] = accuracy (in [0, 1])."""
     out = {}
     if not V1_DIR.exists():
         return out
-    fn_re = re.compile(r"^(.+)_seed(\d+)\.json$")
+    fn_re = re.compile(r"^(.+)_seed(\d+)\.log$")
     cell_re = re.compile(r"^(?:indomain|xdomain)_([a-z]+)_(.+)$")
-    for jpath in V1_DIR.glob("*.json"):
-        m = fn_re.match(jpath.name)
+    acc_re = re.compile(r"Best Testing:\s*Acc\s*=\s*([\d.]+)")
+    for lpath in V1_DIR.glob("*.log"):
+        m = fn_re.match(lpath.name)
         if not m:
             continue
         cell_id, seed = m.group(1), int(m.group(2))
@@ -92,19 +93,23 @@ def collect_v1_simmtm_cls():
             continue
         loss = cm.group(1)
         target_part = cm.group(2)
-        # Map to dt_id consistent with v2 spec
         if cell_id.startswith("indomain_"):
             dt_id = f"in_{target_part}"
         else:
-            # xdomain_loss_Source__Target → split on __
             if "__" not in target_part:
                 continue
             src, tgt = target_part.split("__", 1)
             dt_id = f"xd_{src}_{tgt}"
         try:
-            d = json.loads(jpath.read_text())
-            acc = d.get("accuracy", d.get("acc", d.get("top1", -1.0)))
-            out[(dt_id, seed, loss)] = float(acc)
+            text = lpath.read_text()
+            best_match = None
+            for line in text.splitlines():
+                am = acc_re.search(line)
+                if am:
+                    best_match = am
+            if best_match:
+                acc_pct = float(best_match.group(1))  # log uses percent (e.g. 94.58)
+                out[(dt_id, seed, loss)] = acc_pct / 100.0
         except Exception:
             continue
     return out
