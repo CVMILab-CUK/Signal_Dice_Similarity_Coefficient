@@ -68,3 +68,36 @@ After GPT4TS sweep ≥85/90 DONE:
 2. `python3 paper_supplement/scripts/analyze_v2.py` → produces summary
 3. `grep -c "PASS" paper_supplement/protocol/v2_results_summary.md` → check AC-CL2-3/4 counts
 4. Gate decision logged in this file (append section "Gate Decision YYYY-MM-DD").
+
+---
+
+## Gate Decision 2026-06-21 15:02
+
+**Status**: ✅ Option A (STOP at 8 backbones) TRIGGERED.
+
+**Evidence (sweep at 85/90 DONE, 0 FAIL)**:
+- In-domain loss-identity (AC-CL2-3): **9/9 PASS at ≤2%** (threshold was ≥7/8). 8/9 cells bitwise 0.00% (architectural per Section 17.10), 1/9 (SimMTM-Cls Epilepsy) at 0.13% loss-in-pretrain.
+- Cross-domain TOST (AC-CL2-4): **8/9 PASS** (threshold was ≥4/6).
+  - GPT4TS 3/3 architectural PASS
+  - TS2Vec 3/3
+  - TFC 1/1
+  - SimMTM-Cls 1/2 (Gesture xd FAIL with 14% MSE-SDSC diff — honest report)
+
+**Falsification gates**:
+- Gate 1 (catastrophic ZCR): not triggered (loss-identity bitwise per seed including chance regime)
+- Gate 2 (TS-2024 reviewer simulation): defer to camera-ready review
+- Gate 3 (HAR seed42 1.09% spurious): resolved (3-seed bitwise 0.00%)
+
+**Path forward**: tag `sdsc-canonical-v10` after remaining 5 cells (ECG seed123 + seed2024) complete, then paper writing.
+
+**Honest scope** (per Section 18):
+- Claim 4 SSL families (masked + contrastive×2 + LLM frozen)
+- Do NOT claim Mamba/foundation-model coverage
+- GPT4TS cross-domain failure (median acc 0.20 on Epilepsy) reported as **paradigm-specific limitation**, not framework failure — C-4 SDSC reconstruction is robust (~0.96) regardless
+
+**Decision rejected**: Option B (TimeMixer addition). Reasons:
+- Compute budget exhausted (paper writing has 8 weeks)
+- 4 SSL families already adequate
+- Adding 5th family without specific reviewer-tied need is completeness theater
+
+**ADR finalization**: This decision permanently locks in 8-backbone scope for AAAI27 submission.
