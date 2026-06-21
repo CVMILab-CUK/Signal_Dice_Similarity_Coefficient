@@ -26,6 +26,7 @@ from scipy import stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 V2_DIR = REPO_ROOT / "SimMTM_Classification" / "outputs" / "v2_sweep"
+V3_DIR = REPO_ROOT / "SimMTM_Classification" / "outputs" / "v3_gpt4ts_sweep"
 V1_DIR = REPO_ROOT / "SimMTM_Classification" / "outputs" / "classification_sweep"
 SEEDCELLS = REPO_ROOT / "paper_supplement" / "protocol" / "classification_seedcells_v2.json"
 RES_NPZ = REPO_ROOT / "paper_supplement" / "protocol" / "v2_results.npz"
@@ -43,9 +44,35 @@ def collect_v2():
     """Returns:
        c4[(backbone, dt_id, seed)] = {metric_name: value}
        c5[(backbone, dt_id, seed, loss)] = accuracy
+    Includes v2_sweep (TFC/TS2Vec) + v3_gpt4ts_sweep (GPT4TS).
     """
     c4 = {}
     c5 = {}
+
+    # V3 GPT4TS layout: v3_gpt4ts_sweep/{dt_id}/seed{N}/c4_result.json (no backbone subdir)
+    if V3_DIR.exists():
+        for c4_json in V3_DIR.rglob("c4_result.json"):
+            try:
+                d = json.loads(c4_json.read_text())
+                backbone = d["backbone"]  # "GPT4TS" from JSON content
+                parts = c4_json.parts
+                dt_id = parts[-3]
+                seed = int(parts[-2].replace("seed", ""))
+                c4[(backbone, dt_id, seed)] = d.get("metrics", {})
+            except Exception:
+                continue
+        for c5_json in V3_DIR.rglob("c5_*_result.json"):
+            try:
+                d = json.loads(c5_json.read_text())
+                backbone = d["backbone"]
+                loss = d["recon_loss"]
+                parts = c5_json.parts
+                dt_id = parts[-3]
+                seed = int(parts[-2].replace("seed", ""))
+                c5[(backbone, dt_id, seed, loss)] = d.get("accuracy", -1.0)
+            except Exception:
+                continue
+
     if not V2_DIR.exists():
         return c4, c5
     for c4_json in V2_DIR.rglob("c4_result.json"):
