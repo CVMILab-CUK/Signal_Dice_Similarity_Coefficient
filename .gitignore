@@ -3,3 +3,5 @@ __pycache__
 # Upstream backbones (TF-C, TS2Vec) cloned by paper_supplement/scripts/setup_backbones.sh.
 # These directories are themselves git repos; do not track inside parent repo.
 backbones/
+# auto-generated sweep flags
+paper_supplement/scripts/v*_triggered.flag
