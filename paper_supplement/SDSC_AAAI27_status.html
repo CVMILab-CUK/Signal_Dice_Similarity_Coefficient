@@ -43,11 +43,12 @@
 <div class="meta">
   Tag: <code>sdsc-canonical-v9</code> · Author: dlwpdud@gmail.com · Venue: AAAI 2027 (deadline 2026-08-15) · 8주 남음<br>
   Prior rejections: AAAI26, ICLR26, ICML26 — 모두 reject<br>
-  <span class="tag good">Day 1 Plan G' 진행 중</span> GPT4TS (NeurIPS'23 LLM) sweep 45/90 cells DONE (FAIL=0). <strong>In-domain 45/45 COMPLETE → 9/9 loss-neutral PASS, 8/9 bitwise 0.00%</strong>. Cross-domain phase (45 cells) 진행 중. Tag <code>v10</code> 예정.
+  <span class="tag good">Day 1 Plan G' 진행 중</span> GPT4TS (NeurIPS'23 LLM) sweep 55/90 cells DONE (FAIL=0).<br>
+  <span class="tag warn">⚠️ AC-CL2-3 reframe</span> Section 17.10 retraction: C-5 classifier reads encoder output only (not recon_head output) — classifier-acc bitwise identity across MSE/SDSC/ZCR is <strong>architectural design</strong>, not empirical loss-neutrality. Honest reframe: C-5 demonstrates SDSC <strong>trainable as post-hoc loss</strong> across 4 SSL paradigms (recon_loss values differ as expected per loss). C-4 reconstruction differentiation and cross-domain TOST equivalence remain valid claims.
 </div>
 
 <div class="oneliner">
-<strong>한 줄:</strong> Forecasting paper의 V1(metric)+V3(model selection)+AC-6(TOST) 완료 = AAAI-clean path 확정. Classification 트랙은 4 SSL families (masked + contrastive×2 + LLM) <strong>9/9 in-domain loss-neutral PASS</strong> (8/9 bitwise 0.00%) + 5/6 cross-domain TOST 통과 (cross-domain GPT4TS 추가 진행 중) = 이전 reject 사유(QVmd cross-domain 모순, 4Zmu in-domain only, 5F1V single backbone) 직접 대응.
+<strong>한 줄:</strong> Forecasting paper의 V1(metric)+V3(model selection)+AC-6(TOST) 완료 = AAAI-clean path 확정. Classification 트랙은 4 SSL families (masked + contrastive×2 + LLM) C-4 reconstruction differentiation + cross-domain TOST equivalence. <span class="tag warn">AC-CL2-3 reframed</span>: 원래 classifier-acc identity 주장은 architectural design (decoupled head)이므로 retracted. Honest claim: SDSC trainable as post-hoc loss across paradigms (recon_loss converges).
 </div>
 
 <!-- ============================================================ -->
