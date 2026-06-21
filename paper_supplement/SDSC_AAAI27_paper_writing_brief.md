@@ -839,29 +839,30 @@ GPT4TS in-domain accuracies (3-seed average, frozen LM + post-hoc head):
 
 **Most important headline**: SDSC ranking varies meaningfully across (backbone, dataset) — i.e., SDSC differentiates encoder quality. This **strengthens C-4 generalization claim** that SDSC works as a measurement instrument across paradigms (contrastive, masked, and now LLM).
 
-### 17.9 Cross-domain preliminary (xd_SleepEEG_Epilepsy seed42 only, 50/90)
+### 17.9 Cross-domain preliminary (xd_SleepEEG_Epilepsy 2 seeds, 55/90)
 
-First cross-domain data point for GPT4TS — striking divergence between **C-4 reconstruction quality** and **C-5 downstream usefulness**:
+**Correction from prior commit (cf0fd3d)**: My earlier writeup over-interpreted seed42 (0.196 catastrophic acc) as a "framework-validating" structural-vs-task divergence. With seed123 now done at **0.847** (normal range), the seed42 result is revealed as a single-seed outlier, not a paradigm-level failure. Honest reporting requires correcting the narrative.
 
-| Quantity | Value | Comparison |
-|---|---|---|
-| C-4 SDSC reconstruction | 0.9784 | Highest among all 4 backbones |
-| C-4 MSE recon | 0.0027 | Excellent (tight reconstruction) |
-| C-4 ZCR_soft | 0.0002 | Near-perfect sign preservation |
-| C-5 classifier acc (MSE head) | 0.1962 | Below random 0.5 (binary Epilepsy) |
-| C-5 classifier acc (SDSC head) | 0.1962 | Bitwise identical → loss-neutral PASS |
-| Other backbones C-5 acc | 0.93 (TFC), 0.92 (TS2Vec) | GPT4TS catastrophically fails the transfer |
+| Seed | C-4 SDSC | C-5 MSE acc | C-5 SDSC acc | C-5 ZCR acc | Loss-neutrality |
+|---|---|---|---|---|---|
+| seed42 | 0.9670 | 0.1962 | 0.1962 | 0.1962 | bitwise 0.00% (outlier acc) |
+| seed123 | 0.9641 | 0.8469 | 0.8469 | 0.8469 | bitwise 0.00% (normal acc) |
+| seed2024 | pending | pending | pending | pending | — |
+| **2-seed avg** | **0.9656** | **0.5216** | **0.5216** | **0.5216** | **bitwise 0.00%** |
 
-**Story signal — this is the canonical SDSC argument**: GPT4TS frozen-LM reconstructs Epilepsy signal *structurally* very well (SDSC=0.98) but the representations don't transfer to a usable classifier. **Different metrics measure different qualities.** A reviewer cannot collapse "high reconstruction" to "good model" — this is exactly what Sections 9.1 (Plan B' framing) and 12 (loss-neutrality vs metric-discrimination split) argue.
+**What this actually shows (revised)**:
+1. **Loss-neutrality holds bitwise within each seed** even when downstream acc varies wildly (0.20 → 0.85). Strong evidence for decoupled-head design generalization to LLM paradigm.
+2. **C-4 SDSC reconstruction is robust across seeds** (0.9670/0.9641 — within 0.003 of each other). The encoder representation is stable; downstream classifier head training is what varies by seed initialization.
+3. **The "metric-not-task" framing still holds** as a general principle — C-4 measures reconstruction structure regardless of downstream noise — but we cannot use this 2-seed data as direct evidence. The seed-to-seed variance ON c5 classifier acc (0.20 vs 0.85) on the same encoder is the real cautionary tale: small-target-dataset classification (Epilepsy = 60 train samples) is fragile, not the SDSC framework.
 
-**Loss-neutrality cross-domain (1/9 cells so far)**: GPT4TS xd_SleepEEG_Epilepsy seed42 MSE=SDSC=ZCR all 0.1962 (bitwise identical). Decoupled-head pattern HOLDS even in failure regime. Strong cross-paradigm framework consistency.
+**Loss-neutrality cross-domain (2/9 cells)**: GPT4TS xd_SleepEEG_Epilepsy both seeds MSE=SDSC=ZCR bitwise identical. Decoupled-head pattern HOLDS across both extreme acc points. Cross-paradigm consistency confirmed.
 
-**Remaining 40 cells** = SleepEEG_Epilepsy seed{123,2024} + SleepEEG_Gesture × 3 seeds + ECG_Epilepsy × 3 seeds = 8 + 15 + 15 + 2 (residual) = 40. ETA ~4h (SleepEEG pretrain ~38 min/seed bottleneck, downstream cells ~15 sec each).
+**Remaining 35 cells** = SleepEEG_Epilepsy seed2024 (5) + SleepEEG_Gesture × 3 seeds (15) + ECG_Epilepsy × 3 seeds (15). ETA ~3h.
 
-Falsification gate 1 status: not triggered (catastrophic ZCR not observed — ZCR=MSE bitwise on the failure cell).
-Falsification gate 3 status: not triggered (in-domain 3-seed avg resolved 1.09% seed42 → 0.00%).
+Falsification gate 1 status: not triggered (loss-neutrality holds even at 0.20 acc).
+Falsification gate 3 status: not triggered (in-domain bitwise 0.00%).
 
-If 3-seed avg confirms <0.5 cross-domain acc for GPT4TS on Epilepsy: report honestly. The thesis is *not* "all backbones generalize". The thesis is *SDSC measures structure, AC-6 TOST detects practical-equivalence to MSE on what acc-can-detect, and SDSC behaves loss-neutrally across decoupled head designs*. GPT4TS Epilepsy failure validates the framework rather than breaks it.
+**Lesson for paper writing**: do not narrate single-cell results as framework validation. Wait for 3-seed averaging before drawing thesis claims. The original commit cf0fd3d should be amended or annotated when sweep finishes.
 
 ## 18. Future work (limitations + post-AAAI27 roadmap)
 
